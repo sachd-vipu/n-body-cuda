@@ -35,9 +35,18 @@ void CalculateForce(float* x, float *y, float *z,float *vx, float *vy, float *vz
     kernel5_compute_forces_n_bodies<<< params.gridSize, params.blockSize >>>(x, y, z, vx, vy, vz, ax, ay, az, mass, sorted, child, left, right, p_count);
 }
 
-void UpdateParticles(float* x, float *y, float *z,  float *vx, float *vy, float *vz, float *ax, float *ay, float *az, int p_count, float dt, float dist)
+void UpdateParticles(float* x, float *y, float *z,  float *vx, float *vy, float *vz, float *ax, float *ay, float *az, int p_count, float dt, float damp)
 {
-	kernel6_update_velocity_position<<<params.gridSize, params.blockSize >>>(x, y, z, vx, vy, vz, ax, ay, az, p_count, dt, dist);
+	kernel6_update_velocity_position<<<params.gridSize, params.blockSize >>>(x, y, z, vx, vy, vz, ax, ay, az, p_count, dt, damp);
 }
 
+void PopulateCoordinates(float *x, float *y, float *z, float *output, int p_count) 
+{
+	aux_kernel_copy_3D_coordinate_array<<<params.gridSize, params.blockSize >>>(x, y, z, output ,p_count) ;
+}
+
+ void ResetArrays(float *x, float *y, float *z, float *top, float *bottom, float *right, float *left, float *front, float *back, float *mass, int *count, int *root, int* sorted, int *child, int *index, int* mutex, int p_count, int node_count) 
+{
+	aux_kernel_initialize_device_arrays<<<params.gridSize, params.blockSize >>>(x, y, z,top, bottom, right, left, front, back, mass, count, root,  sorted, child, index,  mutex,  p_count,  node_count);
+}
 

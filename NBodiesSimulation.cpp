@@ -201,7 +201,6 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 
 
 	void NBodiesSimulation::runAnimation(){
-		particles->reset();
 
 		setParticlePosition(host_x, host_y, host_z, host_vx, host_vy, host_vz, host_ax, host_ay, host_az, host_mass, BodyCount);
 		cudaMemcpy(device_x, host_x, sizeof(host_x), cudaMemcpyHostToDevice);
@@ -216,18 +215,20 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 		cudaMemcpy(device_mass, host_mass, sizeof(host_mass), cudaMemcpyHostToDevice);
 
 	
-		for(int i=0;i< 1000 ;i++){ 
+		for(int i=0;i< 300 ;i++){ 
 			float time;
 			cudaEventCreate(&start);
 			cudaEventCreate(&stop);
 			cudaEventRecord(start, 0);
 
+			ResetArrays(device_x, device_y, device_z, device_top, device_bottom, device_right, device_left, device_front, device_back, device_mass, device_count, device_root, device_sorted, device_child, device_index, device_mutex, BodyCount, Nodes);
 			ComputeBoundingBox(device_x, device_y, device_z,  device_top, device_bottom, device_right, device_left, device_front, device_back, device_mutex, BodyCount);
-			ConstructOctree();
-			ComputeBodyInfo();
-			SortBodies();
-			CalculateForce();
-			UpdateParticles();
+			ConstructOctree(device_x, device_y, device_z, device_top, device_bottom, device_right, device_left, device_front, device_back, device_mass, device_count, device_root, device_child, device_index, BodyCount, Nodes);
+			ComputeBodyInfo(device_x, device_y, device_z, device_mass, device_index, BodyCount);
+			SortBodies(device_count, device_root, device_sorted, device_child, device_index, BodyCount);
+			CalculateForce(device_x, device_y, device_z, device_vx, device_vy, device_vz, device_ax, device_ay, device_az, device_mass, device_sorted, device_child, device_left, device_right, BodyCount);
+			UpdateParticles(device_x, device_y, device_z, device_vx, device_vy, device_vz, device_ax, device_ay, device_az, BodyCount, 0.001, 1.0);
+			PopulateCoordinates(device_x, device_y, device_z, device_output, Nodes);
 
 			cudaeventrecord(stop, 0);
 			cudaeventSynchronize(stop);

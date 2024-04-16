@@ -417,7 +417,7 @@ __global__ void kernel5_compute_forces_n_bodies(float* x, float *y, float *z,flo
     }
 }
 
-__global__ void kernel6_update_velocity_position(float* x, float *y, float *z,  float *vx, float *vy, float *vz, float *ax, float *ay, float *az, int p_count, float dt, float dist) {
+__global__ void kernel6_update_velocity_position(float* x, float *y, float *z,  float *vx, float *vy, float *vz, float *ax, float *ay, float *az, int p_count, float dt, float damp) {
     int index = threadIdx.x + blockIdx.x * blockDim.x;
     int stride = blockDim.x * gridDim.x;
 
@@ -426,13 +426,59 @@ __global__ void kernel6_update_velocity_position(float* x, float *y, float *z,  
         vy[i] += ay[i] * dt; 
         vz[i] += az[i] * dt;
 
-        x[i] += vx[i] * dt * dist;
-        y[i] += vy[i] * dt * dist;
-        z[i] += vz[i] * dt * dist;
+        x[i] += vx[i] * dt * damp;
+        y[i] += vy[i] * dt * damp;
+        z[i] += vz[i] * dt * damp;
     }
 }
 
-int main(int argc, char** argv) {
-    Body* bodies;
-    return 0;
+__global__ void aux_kernel_copy_3D_coordinate_array(float *x, float *y, float *z, float *output, int p_count) {
+    int index = threadIdx.x + blockIdx.x * blockDim.x;
+    int stride = blockDim.x * gridDim.x;
+
+    for(int i = index; i < p_count; i += stride) {
+        output[3*i] = x[i];
+        output[3*i + 1] = y[i];
+        output[3*i + 2] = z[i];
+    }
+}
+
+__global__ void aux_kernel_initialize_device_arrays(float *x, float *y, float *z, float *top, float *bottom, float *right, float *left, float *front, float *back, float *mass, int *count, int *root, int* sorted, int *child, int *index, int* mutex, int p_count, int node_count) {
+    int cu_index = threadIdx.x + blockIdx.x * blockDim.x;
+    int stride = blockDim.x * gridDim.x;
+
+    // Initialize the arrays , only once, data already in GPU. 
+    for(int i = cu_index; i < node_count; i += stride) {
+        
+        #pragma unroll 8
+        for(int j = 0; j < 8; j++) {
+            child[8*i + j] = -1;
+        }
+
+        if(i < p_count) {
+            count[i] = 1;
+        }
+        else {
+            count[i] = 0;
+            x[i] = 0.0f;
+            y[i] = 0.0f;
+            z[i] = 0.0f;
+            mass[i] = 0.0f;
+        }
+        root[i] = -1;
+        sorted[i] = -1;
+    }
+    
+    if(cu_index == 0){
+	*mutex = 0;
+	*left = 0;
+	*right = 0;
+	*bottom = 0;
+	*top = 0;
+    *front = 0;
+    *back = 0;   
+   	*index = p_count;
+
+    }
+    
 }

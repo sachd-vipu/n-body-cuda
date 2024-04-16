@@ -1,74 +1,10 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include "NBodiesSimulation.hpp"
 #include "kernel_api.cu"
 using namespace std;
-class NBodiesSimulation
-{
-		int BodyCount;
-		int Nodes;
 
-        // the sequence in which these arrays will be populated is important to maximize coalescing
-		int *host_child;
-        int *host_root;
-        int *host_sorted;
-        int *host_count;        
-       
-		float *host_left;
-		float *host_right;
-		float *host_bottom;
-		float *host_top;
-        float *host_front;
-        float *host_back;
-	
-        float *host_x;
-        float *host_y;
-        float *host_z;
-        float *host_vx;
-        float *host_vy;
-        float *host_vz;
-        float *host_ax;
-        float *host_ay;
-        float *host_az;
-
-    	float *host_mass;
-
-		int *host_child;
-        int *host_root;
-        int *host_sorted;
-        int *host_count;
-
-		float *device_left;
-		float *device_right;
-		float *device_bottom;
-		float *device_top;
-		float *device_front;
-		float *device_back;
-		
-        float *device_x;
-        float *device_y;
-        float *device_z;
-        float *device_vx;
-        float *device_vy;
-        float *device_vz;
-        float *device_ax;
-        float *device_ay;
-        float *device_az;
-        float *device_mass;
-
-		int *device_index;
-		int *device_child;
-		int *device_root;
-		int *device_sorted;
-		int *device_count;
-		int *device_mutex;  
-
-		cudaEvent_t start, stop; 
-
-		float *host_output;  
-		float *device_output;  
-
-	public:
-		NBodiesSimulation(const SimulationParameters p, const int num_bodies){
+NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 			BodyCount = num_bodies;
 			//Nodes = 8 * BodyCount + 1 ; // each node gets 8 children  1 for the root
 			//  TODO : Not all the noded are used. Need to optimize this
@@ -133,7 +69,7 @@ class NBodiesSimulation
 			cudaMemSet(device_sorted, 0, Nodes * sizeof(int));
 
 		}
-		~NBodiesSimulation(){
+		NBodiesSimulation::~NBodiesSimulation(){
 			
 			delete[] host_output;
 			delete[] host_x;
@@ -185,15 +121,11 @@ class NBodiesSimulation
 			cudaDeviceSynchronize();
 		}
 
-		int getNumParticles();
-		void update();
-		void reset();
-
-		const float* getOutput(){
+		const float* NBodiesSimulation::getOutput(){
 			return host_output;
 		}
 
-		void setParticlePosition(float* x, float* y, float* z, float* vx, float* vy, float* vz, , float* ax, float*ay, float*az, float* mass, float p_count){
+		void NBodiesSimulation::setParticlePosition(float* x, float* y, float* z, float* vx, float* vy, float* vz, , float* ax, float*ay, float*az, float* mass, float p_count){
 			
 				float acl = 2.0;
 				float pi = 3.14159265;
@@ -268,7 +200,7 @@ class NBodiesSimulation
  
 
 
-	void runAnimation(){
+	void NBodiesSimulation::runAnimation(){
 		particles->reset();
 
 		setParticlePosition(host_x, host_y, host_z, host_vx, host_vy, host_vz, host_ax, host_ay, host_az, host_mass, BodyCount);
@@ -308,7 +240,7 @@ class NBodiesSimulation
 
 		}
 	}
-};
+
 // Use arrays instead of array of struct to maximize coalescing
 // struct Position{
 //     float x;

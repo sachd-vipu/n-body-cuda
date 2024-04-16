@@ -1,10 +1,9 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <stdio.h>
-#include "Oct_Tree.h"
 
 const int blockSize = 256;
- const int warp = 32;
+const int warp = 32;
 const int stackSize = 64;
 const float eps2 = 0.025;
 
@@ -408,7 +407,7 @@ __global__ void kernel5_compute_forces_n_bodies(float* x, float *y, float *z,flo
                     }
                 }
             }
-
+        }
         ax[sortedIndex] = acl_x;
         ay[sortedIndex] = acl_y;
         az[sortedIndex] = acl_z;
@@ -418,7 +417,7 @@ __global__ void kernel5_compute_forces_n_bodies(float* x, float *y, float *z,flo
     }
 }
 
-__global__ void update_velocity_position(float* x, float *y, float *z,  float *vx, float *vy, float *vz, float *ax, float *ay, float *az, int p_count, float dt, float dist) {
+__global__ void kernel6_update_velocity_position(float* x, float *y, float *z,  float *vx, float *vy, float *vz, float *ax, float *ay, float *az, int p_count, float dt, float dist) {
     int index = threadIdx.x + blockIdx.x * blockDim.x;
     int stride = blockDim.x * gridDim.x;
 

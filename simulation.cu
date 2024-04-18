@@ -12,6 +12,8 @@ __global__ void kernel1_bounding_box_computation(float* x, float* y, float *z, f
     int index = threadIdx.x + blockIdx.x * blockDim.x;
     int stride = blockDim.x * gridDim.x;
 
+
+    
     float x_min,x_max;
     x_min = x_max  = x[index];
     float y_min, y_max;
@@ -29,18 +31,13 @@ __global__ void kernel1_bounding_box_computation(float* x, float* y, float *z, f
 
     // Find the bounding box for the current block
     for (int i = index + stride; i < p_count; i += stride) {
-        if (x[i] < x_min) 
-            x_min = x[i];
-        if (x[i] > x_max) 
-            x_max = x[i];
-        if (y[i] < y_min) 
-            y_min = y[i];
-        if (y[i] > y_max) 
-            y_max = y[i];
-        if (z[i] < z_min)
-            z_min = z[i];
-        if (z[i] > z_max)
-            z_max = z[i];
+       x_min = fminf(x_min, x[i]);
+        x_max = fmaxf(x_max, x[i]);
+        y_min = fminf(y_min, y[i]);
+        y_max = fmaxf(y_max, y[i]);
+        z_min = fminf(z_min, z[i]);
+        z_max = fmaxf(z_max, z[i]);  
+        
     }
 
     // Store the bounding box in shared memory
@@ -55,26 +52,17 @@ __global__ void kernel1_bounding_box_computation(float* x, float* y, float *z, f
 
 
     // Reduce the bounding box to find the bounding box for the block
-    for (int s = blockDim.x / 2; s > 0; s >>= 1) {
+    for (int s = blockDim.x / 2; s != 0; s = s >>  1) {
         
         if (threadIdx.x < s) {
-            if (left_s[threadIdx.x + s] < left_s[threadIdx.x]) 
-                left_s[threadIdx.x] = left_s[threadIdx.x + s];
-
-            if (right_s[threadIdx.x + s] > right_s[threadIdx.x]) 
-                right_s[threadIdx.x] = right_s[threadIdx.x + s];
-
-            if (top_s[threadIdx.x + s] > top_s[threadIdx.x]) 
-                top_s[threadIdx.x] = top_s[threadIdx.x + s];
-                
-            if (bottom_s[threadIdx.x + s] < bottom_s[threadIdx.x]) 
-                bottom_s[threadIdx.x] = bottom_s[threadIdx.x + s];
-            
-            if (front_s[threadIdx.x + s] > front_s[threadIdx.x])
-                front_s[threadIdx.x] = front_s[threadIdx.x + s];
-            
-            if (back_s[threadIdx.x + s] < back_s[threadIdx.x])
-                back_s[threadIdx.x] = back_s[threadIdx.x + s];
+           
+            left_s[threadIdx.x] = fminf(left_s[threadIdx.x + s], left_s[threadIdx.x]);
+            right_s[threadIdx.x] = fmaxf(right_s[threadIdx.x + s], right_s[threadIdx.x]);
+            top_s[threadIdx.x] = fmaxf(top_s[threadIdx.x + s], top_s[threadIdx.x]);
+            bottom_s[threadIdx.x] = fminf(bottom_s[threadIdx.x + s], bottom_s[threadIdx.x]);
+            front_s[threadIdx.x] = fmaxf(front_s[threadIdx.x + s], front_s[threadIdx.x]);
+            back_s[threadIdx.x] = fminf(back_s[threadIdx.x + s], back_s[threadIdx.x]);
+                      
         }
         __syncthreads();
     }
@@ -82,19 +70,12 @@ __global__ void kernel1_bounding_box_computation(float* x, float* y, float *z, f
     // Assign the writing block bounding box to global memory to thread 0
     if (threadIdx.x == 0) {
         while (atomicCAS(mutex, 0, 1) != 0);
-        if (left_s[0] < *left) 
-            *left = left_s[0];
-        if (right_s[0] > *right) 
-            *right = right_s[0];
-        if (top_s[0] > *top) 
-            *top = top_s[0];
-        if (bottom_s[0] < *bottom) 
-            *bottom = bottom_s[0];
-        if (front_s[0] > *front)
-            *front = front_s[0];
-        if (back_s[0] < *back) 
-            *back = back_s[0];
-            
+        *left = fminf(left_s[0], *left);
+        *right = fmaxf(right_s[0], *right);
+        *top = fmaxf(top_s[0], *top);
+        *bottom = fminf(bottom_s[0], *bottom);
+        *front = fmaxf(front_s[0], *front);
+        *back = fminf(back_s[0], *back);            
         atomicExch(mutex, 0);
     }
 
@@ -112,8 +93,9 @@ __global__ void kernel2_construct_octree(float* x, float* y, float *z, float* to
     float l, r, t, b, f, ba;
     int temp, childPath;
 
-    for(int i = cu_index ; i < p_count ;){
-
+    int i  = cu_index;
+    while(i < p_count ){
+        
         if(isNewBody){
             l = *left;
             r = *right;
@@ -130,7 +112,7 @@ __global__ void kernel2_construct_octree(float* x, float* y, float *z, float* to
                 childPath += 1;
             }
             else{
-                l = (l + r) / 2;
+                l = (l + r) * 0.5;
             }
 
             if(y[i] < (t + b) * 0.5){
@@ -153,7 +135,7 @@ __global__ void kernel2_construct_octree(float* x, float* y, float *z, float* to
 
         int ch_index = child[temp*8 + childPath];
 
-        for( int ch_index = child[temp*8 + childPath]; ch_index > p_count; ch_index = child[temp*8 + childPath]){
+        for( ; ch_index >= p_count; ){
             temp = ch_index;
             childPath = 0;
 
@@ -162,7 +144,7 @@ __global__ void kernel2_construct_octree(float* x, float* y, float *z, float* to
                 childPath += 1;
             }
             else{
-                l = (l + r) / 2;
+                l = (l + r) *0.5;
             }
 
             if(y[i] < (t + b) * 0.5){
@@ -186,7 +168,7 @@ __global__ void kernel2_construct_octree(float* x, float* y, float *z, float* to
             atomicAdd(&z[temp], mass[i] * z[i]);
             atomicAdd(&mass[temp], mass[i]);
             atomicAdd(&count[temp], 1);
-        
+            ch_index = child[temp*8 + childPath];
         }
 
         if(ch_index != -2){
@@ -222,9 +204,10 @@ __global__ void kernel2_construct_octree(float* x, float* y, float *z, float* to
                         x[cell] += mass[ch_index] * x[ch_index];
                         y[cell] += mass[ch_index] * y[ch_index];
                         z[cell] += mass[ch_index] * z[ch_index];
-                        mass[cell] += count[ch_index];
+                        mass[cell] += mass[ch_index];
+                        count[cell] += count[ch_index];
                         child[8 * cell + childPath] = ch_index;
-                        root[ch_index] = -1;
+                        root[cell] = -1;
 
                         // new
 
@@ -292,7 +275,7 @@ __global__ void kernel3_body_information_octree_node(float* x, float* y, float *
 
 __global__ void kernel4_approximation_sorting(int *count, int *root, int *sorted, int *child, int *index, int p_count) {
 
-    int cu_index = p_count + threadIdx.x + blockIdx.x * blockDim.x;
+    int cu_index = threadIdx.x + blockIdx.x * blockDim.x;
     int stride = blockDim.x * gridDim.x;
     int start = 0;
 
@@ -311,7 +294,8 @@ __global__ void kernel4_approximation_sorting(int *count, int *root, int *sorted
     }
 
     // for each cell i    
-    for(int i = cu_index + p_count; i < *index; i += stride) {
+    int idx = *index;
+    for(int i = cu_index + p_count; i < idx; ) {
         start = root[i];
         if(start >=0){
             for(int j = 0; j < 8; j++){
@@ -326,15 +310,15 @@ __global__ void kernel4_approximation_sorting(int *count, int *root, int *sorted
                     start++;
                 }
             }
+            i+=stride;
         }
     }
-
 }
 
 
 __global__ void kernel5_compute_forces_n_bodies(float* x, float *y, float *z,float *vx, float *vy, float *vz, float *ax, float *ay, float *az, float *mass, int *sorted, int *child, float *left, float *right, int p_count)
 {
-    int index = threadIdx.x + blockIdx.x * blockDim.x;
+    int cu_index = threadIdx.x + blockIdx.x * blockDim.x;
     int stride = blockDim.x * gridDim.x;
 
     __shared__ float depth_s[stackSize*blockSize /warp];
@@ -353,7 +337,7 @@ __global__ void kernel5_compute_forces_n_bodies(float* x, float *y, float *z,flo
     int counter = threadIdx.x % warp;
     int stackStartIndex = stackSize * (threadIdx.x / warp);
 
-    for(int i= index; i< p_count; i+= stride ){
+    for(int i= cu_index; i< p_count; i+= stride ){
 
         int sortedIndex = sorted[i];
         float pos_x = x[sortedIndex];
@@ -364,9 +348,9 @@ __global__ void kernel5_compute_forces_n_bodies(float* x, float *y, float *z,flo
         int top = jj + stackStartIndex;
         if(counter == 0){
             int tmp = 0;
-            for (int i = 0; i < 8; i++) {  // Adjust loop for 8 children
+            for (int j = 0; j < 8; j++) {  // Adjust loop for 8 children
                 if (child[i] != -1) {
-                    stack_s[stackStartIndex + tmp] = child[i];
+                    stack_s[stackStartIndex + tmp] = child[j];
                     depth_s[stackStartIndex + tmp] = particle_radius * particle_radius / 0.5;
                     tmp++;
                 }
@@ -375,11 +359,11 @@ __global__ void kernel5_compute_forces_n_bodies(float* x, float *y, float *z,flo
         __syncthreads();
 
         for (; top >= stackSize; top--) {
-        int node = stack_s[top];
-        float depth = depth_s[top];
+            int node = stack_s[top];
+            float depth = depth_s[top];
          // Loop over 8 children for octree
-            for (int i = 0; i < 8; i++) {
-                int ch = child[8 * node + i];  // Adjust indexing for 8 children
+            for (int k = 0; k < 8; k++) {
+                int ch = child[8 * node + k];  // Adjust indexing for 8 children
 
                 if (ch >= 0) {
                     // Include the z dimension in distance calculation
@@ -388,7 +372,7 @@ __global__ void kernel5_compute_forces_n_bodies(float* x, float *y, float *z,flo
                     float dz = z[ch] - pos_z;  // z difference
                     float radii = dx * dx + dy * dy + dz * dz + eps2;//(avoid div by 0);
                     if (ch < p_count  || /*__all_sync*/ __all(0.25* depth <= radii) ) { 
-                        radii = rsqrt(radii);
+                        radii = rcbrtf(radii);
                         float f = mass[ch] * radii * radii * radii;
 
                         acl_x += f * dx;
@@ -416,10 +400,10 @@ __global__ void kernel5_compute_forces_n_bodies(float* x, float *y, float *z,flo
 }
 
 __global__ void kernel6_update_velocity_position(float* x, float *y, float *z,  float *vx, float *vy, float *vz, float *ax, float *ay, float *az, int p_count, float dt, float damp) {
-    int index = threadIdx.x + blockIdx.x * blockDim.x;
+    int cu_index = threadIdx.x + blockIdx.x * blockDim.x;
     int stride = blockDim.x * gridDim.x;
 
-    for(int i = index; i < p_count; i += stride) {
+    for(int i = cu_index; i < p_count; i += stride) {
         vx[i] += ax[i] * dt;
         vy[i] += ay[i] * dt; 
         vz[i] += az[i] * dt;

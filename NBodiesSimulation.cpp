@@ -259,7 +259,7 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 			ComputeBoundingBox(device_x, device_y, device_z,  device_top, device_bottom, device_right, device_left, device_front, device_back, device_mutex, BodyCount);			
 			// sleep(4);
 			// cudaErrorCheck();
-			// ConstructOctree(device_x, device_y, device_z, device_top, device_bottom, device_right, device_left, device_front, device_back, device_mass, device_count, device_root, device_child, device_index, BodyCount);
+			 ConstructOctree(device_x, device_y, device_z, device_top, device_bottom, device_right, device_left, device_front, device_back, device_mass, device_count, device_root, device_child, device_index, BodyCount);
 			cudaErrorCheck();
 
 			ComputeBodyInfo(device_x, device_y, device_z, device_mass, device_index, BodyCount);

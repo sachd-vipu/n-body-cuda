@@ -1,14 +1,27 @@
 #include <cuda.h>
+#include <iostream>
+#include <stdlib.h>
+#include <time.h>
+#include <math.h>
+#include <random>
 #include <cuda_runtime.h>
+#include "kernel_api.cuh"
 #include "NBodiesSimulation.hpp"
-#include "kernel_api.cu"
+#include <unistd.h>
 using namespace std;
+
+#define cudaErrorCheck() { \
+	cudaError_t err = cudaGetLastError(); \
+	if (err != cudaSuccess) { \
+		printf("CUDA error: %s\n", cudaGetErrorString(err)); \
+	} \
+}
 
 NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 			BodyCount = num_bodies;
-			//Nodes = 8 * BodyCount + 1 ; // each node gets 8 children  1 for the root
+			Nodes = 8 * BodyCount + 1 ; // each node gets 8 children  1 for the root
 			//  TODO : Not all the noded are used. Need to optimize this
-			Nodes = 4*BodyCount + 24000;
+			//Nodes = 4*BodyCount + 24000;
 			host_output = new float[BodyCount * 3];
 
 			host_left = new float;
@@ -59,18 +72,28 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 			cudaMalloc((void**)&device_mutex, sizeof(int));
 			cudaMalloc((void**)&device_output, Nodes * 3 * sizeof(float));
 
-			cudaMemSet(device_left, 0, sizeof(float));
-			cudaMemSet(device_right, 0, sizeof(float));
-			cudaMemSet(device_bottom, 0, sizeof(float));
-			cudaMemSet(device_top, 0, sizeof(float));
-			cudaMemSet(device_front, 0, sizeof(float));
-			cudaMemSet(device_back, 0, sizeof(float));
-			cudaMemSet(device_root, -1, Nodes * sizeof(int));
-			cudaMemSet(device_sorted, 0, Nodes * sizeof(int));
+			cudaMemset(device_left, 0, sizeof(float));
+			cudaMemset(device_right, 0, sizeof(float));
+			cudaMemset(device_bottom, 0, sizeof(float));
+			cudaMemset(device_top, 0, sizeof(float));
+			cudaMemset(device_front, 0, sizeof(float));
+			cudaMemset(device_back, 0, sizeof(float));
+			cudaMemset(device_root, -1, Nodes * sizeof(int));
+			cudaMemset(device_sorted, 0, Nodes * sizeof(int));
+			cudaErrorCheck();
 
 		}
 		NBodiesSimulation::~NBodiesSimulation(){
 			
+			cout << "Destructor called" << endl;
+	// print host_output
+			for(int i=0;i<3*Nodes;i++){
+			cout << host_output[i] << " ";
+			if (i%200 == 0){
+				cout << endl;
+			}
+			}
+
 			delete[] host_output;
 			delete[] host_x;
 			delete[] host_y;
@@ -117,15 +140,23 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 			cudaFree(device_index);
 			cudaFree(device_mutex);
 			cudaFree(device_output);
+			
+			cout << "Destructor finished" << endl;
+			cudaError_t err = cudaDeviceSynchronize();
+			if (err != cudaSuccess) {
+					printf("CUDA error: %s\n", cudaGetErrorString(err));
+				}
+						cudaErrorCheck();
 
-			cudaDeviceSynchronize();
+		
+
 		}
 
 		const float* NBodiesSimulation::getOutput(){
 			return host_output;
 		}
 
-		void NBodiesSimulation::setParticlePosition(float* x, float* y, float* z, float* vx, float* vy, float* vz, , float* ax, float*ay, float*az, float* mass, float p_count){
+		void NBodiesSimulation::setParticlePosition(float* x, float* y, float* z, float* vx, float* vy, float* vz,  float* ax, float*ay, float*az, float* mass, float p_count){
 			
 				float acl = 2.0;
 				float pi = 3.14159265;
@@ -134,7 +165,7 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 				uniform_real_distribution<float> distribution_outer(1, 5.0);
 				uniform_real_distribution<float> distributionZ(0.0, 3.0);
 				uniform_real_distribution<float> distribution_theta(0.0, 2 * pi);
-
+				float gravity = 6.6743e-11;
 
 				// loop through all particles
 				for (int i = 0; i < p_count; i++){
@@ -157,7 +188,7 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 						y[i] = 20*sin(theta);
 						z[i] = x[i] + y[i]; 
 					}
-					else if(i<=3*n/4){
+					else if(i<=3*p_count/4){
 						mass[i] = 1.0;
 						x[i] = offset1 *cos(theta);
 						y[i] = offset1 *sin(theta);
@@ -172,18 +203,18 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 
 
 					float rotation = 1;  
-					float v1 = 1.0*sqrt(parameters.gravity*100000.0 / r1);
-					float v2 = 1.0*sqrt(parameters.gravity*25000.0 / r2);
-					float v = 1.0*sqrt(parameters.gravity*100000.0 / sqrt(800));
+					float v1 = 1.0*sqrt(gravity*100000.0 / offset1);
+					float v2 = 1.0*sqrt(gravity*25000.0 / offset2);
+					float v = 1.0*sqrt(gravity*100000.0 / sqrt(800));
 					if(i==0 || i==1){
 						vx[0] = 0;
 						vy[0] = 0;
 						vz[0] = 0;
 					}
-					else if(i<=3*n/4){
+					else if(i<=3*p_count/4){
 						vx[i] = rotation*v1*sin(theta);
 						vy[i] = -rotation*v1*cos(theta);
-						vz[i] = rotation`*v1*sin(theta) * cos(theta) ;
+						vz[i] = rotation*v1*sin(theta) * cos(theta) ;
 					}
 					else{
 						vx[i] = rotation*v2*sin(theta);
@@ -203,6 +234,7 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 	void NBodiesSimulation::runAnimation(){
 
 		setParticlePosition(host_x, host_y, host_z, host_vx, host_vy, host_vz, host_ax, host_ay, host_az, host_mass, BodyCount);
+		
 		cudaMemcpy(device_x, host_x, sizeof(host_x), cudaMemcpyHostToDevice);
 		cudaMemcpy(device_y, host_y, sizeof(host_y), cudaMemcpyHostToDevice);
 		cudaMemcpy(device_z, host_z, sizeof(host_z), cudaMemcpyHostToDevice);
@@ -215,31 +247,46 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 		cudaMemcpy(device_mass, host_mass, sizeof(host_mass), cudaMemcpyHostToDevice);
 
 	
-		for(int i=0;i< 300 ;i++){ 
+		for(int i=0;i< 600 ;i++){ 
 			float time;
 			cudaEventCreate(&start);
 			cudaEventCreate(&stop);
 			cudaEventRecord(start, 0);
 
 			ResetArrays(device_x, device_y, device_z, device_top, device_bottom, device_right, device_left, device_front, device_back, device_mass, device_count, device_root, device_sorted, device_child, device_index, device_mutex, BodyCount, Nodes);
-			ComputeBoundingBox(device_x, device_y, device_z,  device_top, device_bottom, device_right, device_left, device_front, device_back, device_mutex, BodyCount);
-			ConstructOctree(device_x, device_y, device_z, device_top, device_bottom, device_right, device_left, device_front, device_back, device_mass, device_count, device_root, device_child, device_index, BodyCount, Nodes);
-			ComputeBodyInfo(device_x, device_y, device_z, device_mass, device_index, BodyCount);
-			SortBodies(device_count, device_root, device_sorted, device_child, device_index, BodyCount);
-			CalculateForce(device_x, device_y, device_z, device_vx, device_vy, device_vz, device_ax, device_ay, device_az, device_mass, device_sorted, device_child, device_left, device_right, BodyCount);
-			UpdateParticles(device_x, device_y, device_z, device_vx, device_vy, device_vz, device_ax, device_ay, device_az, BodyCount, 0.001, 1.0);
-			PopulateCoordinates(device_x, device_y, device_z, device_output, Nodes);
+			cudaErrorCheck();
 
-			cudaeventrecord(stop, 0);
-			cudaeventSynchronize(stop);
-			cudaeventelapsedtime(&time, start, stop);
+			ComputeBoundingBox(device_x, device_y, device_z,  device_top, device_bottom, device_right, device_left, device_front, device_back, device_mutex, BodyCount);			
+			// sleep(4);
+			// cudaErrorCheck();
+			// ConstructOctree(device_x, device_y, device_z, device_top, device_bottom, device_right, device_left, device_front, device_back, device_mass, device_count, device_root, device_child, device_index, BodyCount);
+			cudaErrorCheck();
+
+			ComputeBodyInfo(device_x, device_y, device_z, device_mass, device_index, BodyCount);
+			cudaErrorCheck();
+			
+			SortBodies(device_count, device_root, device_sorted, device_child, device_index, BodyCount);
+			cudaErrorCheck();
+			
+			CalculateForce(device_x, device_y, device_z, device_vx, device_vy, device_vz, device_ax, device_ay, device_az, device_mass, device_sorted, device_child, device_left, device_right, BodyCount);
+			cudaErrorCheck();
+			
+			UpdateParticles(device_x, device_y, device_z, device_vx, device_vy, device_vz, device_ax, device_ay, device_az, BodyCount, 0.001, 1.0);
+			cudaErrorCheck();
+			
+			PopulateCoordinates(device_x, device_y, device_z, device_output, Nodes);
+			cudaErrorCheck();
+			cudaEventRecord(stop, 0);
+			cudaEventSynchronize(stop);
+			cudaEventElapsedTime(&time, start, stop);
 			cudaEventDestroy(start);
 			cudaEventDestroy(stop);
-			cout << "Time taken for iteration " <<  << " is " << time << endl;
+			cout << "Time taken for iteration " <<  i << " is " << time << endl;
 
 			cudaMemcpy(host_output, device_output, sizeof(device_output), cudaMemcpyDeviceToHost);
 
 		}
+		cudaDeviceSynchronize();
 	}
 
 // Use arrays instead of array of struct to maximize coalescing

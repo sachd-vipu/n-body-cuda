@@ -1,15 +1,13 @@
-#include <cuda.h>
 #include <cuda_runtime.h>
+
+
 class NBodiesSimulation
 {
 		int BodyCount;
 		int Nodes;
 
         // the sequence in which these arrays will be populated is important to maximize coalescing
-		int *host_child;
-        int *host_root;
-        int *host_sorted;
-        int *host_count;        
+       
        
 		float *host_left;
 		float *host_right;
@@ -68,8 +66,8 @@ class NBodiesSimulation
 	public:
 	NBodiesSimulation(const int num_bodies);
 	~NBodiesSimulation();
-	const float* getOutput()	
-	void setParticlePosition(float* x, float* y, float* z, float* vx, float* vy, float* vz, , float* ax, float*ay, float*az, float* mass, float p_count);			
+	const float* getOutput();
+	void setParticlePosition(float* x, float* y, float* z, float* vx, float* vy, float* vz, float* ax, float*ay, float*az, float* mass, float p_count);			
 	void runAnimation();
 
 };

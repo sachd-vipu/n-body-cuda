@@ -1,5 +1,3 @@
-#include <cuda.h>
-#include <cuda_runtime.h>
 #include <stdio.h>
 
 const int blockSize = 256;
@@ -363,7 +361,7 @@ __global__ void kernel5_compute_forces_n_bodies(float* x, float *y, float *z,flo
         float pos_z = z[sortedIndex];
         float acl_x = 0.0f, acl_y = 0.0f, acl_z = 0.0;
 
-        int top = jj _ stackStartIndex;
+        int top = jj + stackStartIndex;
         if(counter == 0){
             int tmp = 0;
             for (int i = 0; i < 8; i++) {  // Adjust loop for 8 children
@@ -389,7 +387,7 @@ __global__ void kernel5_compute_forces_n_bodies(float* x, float *y, float *z,flo
                     float dy = y[ch] - pos_y;
                     float dz = z[ch] - pos_z;  // z difference
                     float radii = dx * dx + dy * dy + dz * dz + eps2;//(avoid div by 0);
-                    if (ch < p_count  || __all(0.25* depth <= radii) ) { 
+                    if (ch < p_count  || /*__all_sync*/ __all(0.25* depth <= radii) ) { 
                         radii = rsqrt(radii);
                         float f = mass[ch] * radii * radii * radii;
 
@@ -435,7 +433,7 @@ __global__ void kernel6_update_velocity_position(float* x, float *y, float *z,  
 __global__ void aux_kernel_copy_3D_coordinate_array(float *x, float *y, float *z, float *output, int p_count) {
     int index = threadIdx.x + blockIdx.x * blockDim.x;
     int stride = blockDim.x * gridDim.x;
-
+    
     for(int i = index; i < p_count; i += stride) {
         output[3*i] = x[i];
         output[3*i + 1] = y[i];
@@ -446,7 +444,6 @@ __global__ void aux_kernel_copy_3D_coordinate_array(float *x, float *y, float *z
 __global__ void aux_kernel_initialize_device_arrays(float *x, float *y, float *z, float *top, float *bottom, float *right, float *left, float *front, float *back, float *mass, int *count, int *root, int* sorted, int *child, int *index, int* mutex, int p_count, int node_count) {
     int cu_index = threadIdx.x + blockIdx.x * blockDim.x;
     int stride = blockDim.x * gridDim.x;
-
     // Initialize the arrays , only once, data already in GPU. 
     for(int i = cu_index; i < node_count; i += stride) {
         

@@ -1,10 +1,6 @@
+#include "kernel_api.cuh"
 #include "simulation.cu"
 
-struct kernel_params
-{
-    dim3 gridSize = 512;
-    dim3 blockSize = 256;
-}params;      
 
 void ComputeBoundingBox(float* x, float* y, float *z, float* top, float* bottom, float* right, float* left, float *front, float *back, int* mutex, int p_count)
 {

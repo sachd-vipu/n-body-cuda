@@ -1,9 +1,9 @@
 #include <stdio.h>
 
-const int blockSize = 256;
-const int warp = 32;
-const int stackSize = 64;
-const float eps2 = 0.025;
+__device__ const int blockSize = 256;
+__device__ const int warp = 32;
+__device__ const int stackSize = 64;
+__device__ const float eps2 = 0.025;
 
 // Ref: An Efficient CUDA Implementation of the Barnes-Hut Algorithm for the n-Body Simulation
 // Ref: Section B.5, B.6  https://www.aronaldg.org/courses/compecon/parallel/CUDA_Programming_Guide_2.2.1.pdf

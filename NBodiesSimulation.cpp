@@ -11,7 +11,6 @@ using namespace std;
 #include <cuda.h>
 #include <unistd.h>
 
-using namespace std;
 
 #define cudaErrorCheck() { \
 	cudaError_t err = cudaGetLastError(); \
@@ -40,8 +39,8 @@ const GLchar* fragmentSource =
     "    gl_FragColor = vec4(1.0, 1.0, 1.0, 0.1);"
     "}"; 
 
-static int calculateNumNodes(int numParticles, int maxComputeUnits, int warpSize){
-	int numberOfNodes = numParticles * 2;
+static int calculateNumNodes(int BodyCount, int maxComputeUnits, int warpSize){
+	int numberOfNodes = BodyCount * 2;
 		if (numberOfNodes < 1024 * maxComputeUnits)
 			numberOfNodes = 1024 * maxComputeUnits;
 		// multiple of 32	
@@ -50,6 +49,8 @@ static int calculateNumNodes(int numParticles, int maxComputeUnits, int warpSize
 
 			return numberOfNodes;
 }
+
+
 
 
 
@@ -86,7 +87,13 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 			cudaMalloc((void**)&device_top, sizeof(float));
 			cudaMalloc((void**)&device_front, sizeof(float));
 			cudaMalloc((void**)&device_back, sizeof(float));
-			
+			cudaMemset(device_left, 0, sizeof(float));
+			cudaMemset(device_right, 0, sizeof(float));
+			cudaMemset(device_bottom, 0, sizeof(float));
+			cudaMemset(device_top, 0, sizeof(float));
+			cudaMemset(device_front, 0, sizeof(float));
+			cudaMemset(device_back, 0, sizeof(float));
+
 			cudaMalloc((void**)&device_x, Nodes * sizeof(float));
 			cudaMalloc((void**)&device_y, Nodes * sizeof(float));
 			cudaMalloc((void**)&device_z, Nodes * sizeof(float));
@@ -97,25 +104,17 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 			cudaMalloc((void**)&device_ay, Nodes * sizeof(float));
 			cudaMalloc((void**)&device_az, Nodes * sizeof(float));
 			cudaMalloc((void**)&device_mass, Nodes * sizeof(float));
+			cudaMalloc((void**)&device_index, sizeof(int));
 			cudaMalloc((void**)&device_child, 8 * Nodes * sizeof(int));
 			cudaMalloc((void**)&device_root, Nodes * sizeof(int));
 			cudaMalloc((void**)&device_sorted, Nodes * sizeof(int));
 			cudaMalloc((void**)&device_count, Nodes * sizeof(int));
-			cudaMalloc((void**)&device_index, Nodes * sizeof(int));
 			cudaMalloc((void**)&device_mutex, sizeof(int));
-			cudaMalloc((void**)&device_output, Nodes * 3 * sizeof(float));
-
-			cudaMemset(device_left, 0, sizeof(float));
-			cudaMemset(device_right, 0, sizeof(float));
-			cudaMemset(device_bottom, 0, sizeof(float));
-			cudaMemset(device_top, 0, sizeof(float));
-			cudaMemset(device_front, 0, sizeof(float));
-			cudaMemset(device_back, 0, sizeof(float));
 
 			cudaMemset(device_root, -1, Nodes * sizeof(int));
 			cudaMemset(device_sorted, 0, Nodes * sizeof(int));
-			cudaMalloc((void**)&device_output, 3 * Nodes * sizeof(float));
 			cudaErrorCheck();
+			cudaMalloc((void**)&device_output, Nodes * 3 * sizeof(float));
 
 			if(PLOT_OPENGL){
 				settings = new sf::ContextSettings();
@@ -158,28 +157,29 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 			// }
 			// }
 
-			delete[] host_x;
-			delete[] host_y;
-			delete[] host_z;
-			delete[] host_vx;
-			delete[] host_vy;
-			delete[] host_vz;
-			delete[] host_ax;
-			delete[] host_ay;
-			delete[] host_az;
-			delete[] host_mass;
-			delete[] host_child;
-			delete[] host_root;
-			delete[] host_sorted;
-			delete[] host_count;
-			delete[] host_output;
-
 			delete host_left;
 			delete host_right;
 			delete host_bottom;
 			delete host_top;
 			delete host_front;
 			delete host_back;
+			delete [] host_x;
+			delete [] host_y;
+			delete [] host_z;
+			delete [] host_vx;
+			delete [] host_vy;
+			delete [] host_vz;
+			delete [] host_ax;
+			delete [] host_ay;
+			delete [] host_az;
+			delete [] host_mass;
+			delete [] host_child;
+			delete [] host_root;
+			delete [] host_sorted;
+			delete [] host_count;
+			delete [] host_output;
+
+	
 		
 
 			cudaFree(device_left);
@@ -224,13 +224,113 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 		}
 
 
-		const float* NBodiesSimulation::getOutput(){
+
+
+		void NBodiesSimulation::runAnimation()
+		{
+		setParticlePosition(host_x, host_y, host_z, host_vx, host_vy, host_vz, host_ax, host_ay, host_az, host_mass, BodyCount);
+	cudaMemcpy(device_mass, host_mass, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(device_x, host_x, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(device_y, host_y, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(device_z, host_z, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(device_vx, host_vx, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(device_vy, host_vy, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(device_ax, host_ax, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(device_ay, host_ay, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
+
+	
+		for(int i=0;i< ITERATIONS ;i++){ 
+			float time;
+			cudaEventCreate(&start);
+			cudaEventCreate(&stop);
+			cudaEventRecord(start, 0);
+
+			ResetArrays(device_mutex, device_x, device_y, device_z, device_mass, device_count, device_root, device_sorted, device_child, device_index, device_left, device_right, device_bottom, device_top, device_front, device_back, BodyCount, Nodes);
+			ComputeBoundingBox(device_mutex, device_x, device_y, device_z,  device_left, device_right, device_bottom, device_top,  device_front, device_back,  BodyCount);
+			ConstructOctree(device_x, device_y, device_z, device_mass, device_count, device_root, device_child, device_index, device_left, device_right, device_bottom, device_top, device_front, device_back, BodyCount);
+			ComputeBodyInfo(device_x, device_y, device_z, device_mass, device_index, BodyCount);
+			SortBodies(device_count, device_root, device_sorted, device_child, device_index, BodyCount);
+			CalculateForce(device_x, device_y, device_z, device_vx, device_vy, device_vz, device_ax, device_ay, device_az, device_mass, device_sorted, device_child, device_left, device_right, BodyCount, GRAVITY);
+			UpdateParticles(device_x, device_y, device_z, device_vx, device_vy, device_vz, device_ax, device_ay, device_az, BodyCount, TIMESTEP, DAMP);
+			PopulateCoordinates(device_x, device_y, device_z, device_output, Nodes);
+
+			cudaEventRecord(stop,0);
+			cudaEventSynchronize(stop);
+			cudaEventElapsedTime(&time, start, stop);
+			cudaEventDestroy(start);
+			cudaEventDestroy(stop);
+
+			cudaEventDestroy(stop);
+			cout << "Time taken for iteration " <<  i << " is " << time << endl;
+
+			if(PLOT_OPENGL){
+			cudaMemcpy(host_output, device_output, 2*Nodes*sizeof(float), cudaMemcpyDeviceToHost);
+					//cudaDeviceSynchronize();
+			    const float* vertices = getOutput();
+
+				glGenVertexArrays(1, &vao);
+				glBindVertexArray(vao);
+
+				glGenBuffers(1, &vbo);   //generate a buffer
+				glBindBuffer(GL_ARRAY_BUFFER, vbo);   //make buffer active
+				glBufferData(GL_ARRAY_BUFFER, 3 * BodyCount *sizeof(float), vertices, GL_DYNAMIC_DRAW); //copy data to active buffer 
+
+				// Specify the layout of the vertex data
+				GLint posAttrib = glGetAttribLocation(shaderProgram, "position");
+				glEnableVertexAttribArray(posAttrib);
+				glVertexAttribPointer(posAttrib, 2, GL_FLOAT, GL_FALSE, 0, 0);
+
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+				glEnable(GL_BLEND);
+
+				// model, view, and projection matrices
+				glm::mat4 model = glm::mat4(1.0f);
+				glm::mat4 view = glm::mat4(1.0f);
+				// view = glm::rotate(view, float(2*i), glm::vec3(0.0f, 1.0f, 0.0f)); 
+				glm::mat4 projection = glm::ortho(-25.0f, 25.0f, -25.0f, 25.0f, -10.0f, 10.0f);
+
+				// link matrices with shader program
+				GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
+				GLint viewLoc = glGetUniformLocation(shaderProgram, "view");
+				GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
+				glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+				glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+				glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+
+				// Clear the screen to black
+				glClearColor(0.0f, 0.0f, 0.0f, 0.5f);
+				glClear(GL_COLOR_BUFFER_BIT);
+
+				// Draw points
+				glDrawArrays(GL_POINTS, 0, BodyCount);
+
+				// Swap buffers
+				window->display();
+
+				glDeleteBuffers(1, &vbo);
+
+				glDeleteVertexArrays(1, &vao);
+				
+			}
+
+		}
+		
+		if(PLOT_OPENGL){
+			window->close(); 
+		}
+	}
+
+		const float* NBodiesSimulation::getOutput()
+		{
 			return host_output;
 		}
 
-		void NBodiesSimulation::setParticlePosition(float* x, float* y, float* z, float* vx, float* vy, float* vz,  float* ax, float*ay, float*az, float* mass, float p_count){
+
+
+
+void NBodiesSimulation::setParticlePosition(float* x, float* y, float* z, float* vx, float* vy, float* vz,  float* ax, float*ay, float*az, float* mass, float p_count)
+{
 			
-				float a = 1.0;
 	float pi = 3.14159265;
 	std::default_random_engine generator;
 	std::uniform_real_distribution<float> distribution1(1.5, 12.0);
@@ -311,103 +411,7 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
  
 
 
-	void NBodiesSimulation::runAnimation(){
-
-		setParticlePosition(host_x, host_y, host_z, host_vx, host_vy, host_vz, host_ax, host_ay, host_az, host_mass, BodyCount);
-		
-		cudaMemcpy(device_x, host_x, sizeof(host_x), cudaMemcpyHostToDevice);
-		cudaMemcpy(device_y, host_y, sizeof(host_y), cudaMemcpyHostToDevice);
-		cudaMemcpy(device_z, host_z, sizeof(host_z), cudaMemcpyHostToDevice);
-		cudaMemcpy(device_vx, host_vx, sizeof(host_vx), cudaMemcpyHostToDevice);
-		cudaMemcpy(device_vy, host_vy, sizeof(host_vy), cudaMemcpyHostToDevice);
-		cudaMemcpy(device_vz, host_vz, sizeof(host_vz), cudaMemcpyHostToDevice);
-		cudaMemcpy(device_ax, host_ax,  sizeof(host_ax), cudaMemcpyHostToDevice);
-		cudaMemcpy(device_ay, host_ay, sizeof(host_ay), cudaMemcpyHostToDevice);
-		cudaMemcpy(device_az, host_az, sizeof(host_az), cudaMemcpyHostToDevice);
-		cudaMemcpy(device_mass, host_mass, sizeof(host_mass), cudaMemcpyHostToDevice);
-
 	
-		for(int i=0;i< ITERATIONS ;i++){ 
-			float time;
-			cudaEventCreate(&start);
-			cudaEventCreate(&stop);
-			cudaEventRecord(start, 0);
-
-			ResetArrays(device_mutex, device_x, device_y, device_z, device_mass, device_count, device_root, device_sorted, device_child, device_index, device_left, device_right, device_bottom, device_top, device_front, device_back, BodyCount, Nodes);
-			ComputeBoundingBox(device_mutex, device_x, device_y, device_z,  device_left, device_right, device_bottom, device_top,  device_front, device_back,  BodyCount);
-			ConstructOctree(device_x, device_y, device_z, device_mass, device_count, device_root, device_child, device_index, device_left, device_right, device_bottom, device_top, device_front, device_back, BodyCount);
-			ComputeBodyInfo(device_x, device_y, device_z, device_mass, device_index, BodyCount);
-			SortBodies(device_count, device_root, device_sorted, device_child, device_index, BodyCount);
-			CalculateForce(device_x, device_y, device_z, device_vx, device_vy, device_vz, device_ax, device_ay, device_az, device_mass, device_sorted, device_child, device_left, device_right, BodyCount, GRAVITY);
-			UpdateParticles(device_x, device_y, device_z, device_vx, device_vy, device_vz, device_ax, device_ay, device_az, BodyCount, TIMESTEP, DAMP);
-			PopulateCoordinates(device_x, device_y, device_z, device_output, Nodes);
-
-			cudaEventRecord(stop,0);
-			cudaEventSynchronize(stop);
-			cudaEventElapsedTime(&time, start, stop);
-			cudaEventDestroy(start);
-			cudaEventDestroy(stop);
-
-			cudaEventDestroy(stop);
-			cout << "Time taken for iteration " <<  i << " is " << time << endl;
-
-			if(PLOT_OPENGL){
-				cudaMemcpy(host_output, device_output, sizeof(host_output), cudaMemcpyDeviceToHost);
-				//cudaDeviceSynchronize();
-			    const float* vertices = getOutput();
-
-				glGenVertexArrays(1, &vao);
-				glBindVertexArray(vao);
-
-				glGenBuffers(1, &vbo);   //generate a buffer
-				glBindBuffer(GL_ARRAY_BUFFER, vbo);   //make buffer active
-				glBufferData(GL_ARRAY_BUFFER, 3 * BodyCount *sizeof(float), vertices, GL_DYNAMIC_DRAW); //copy data to active buffer 
-
-				// Specify the layout of the vertex data
-				GLint posAttrib = glGetAttribLocation(shaderProgram, "position");
-				glEnableVertexAttribArray(posAttrib);
-				glVertexAttribPointer(posAttrib, 2, GL_FLOAT, GL_FALSE, 0, 0);
-
-				glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-				glEnable(GL_BLEND);
-
-				// model, view, and projection matrices
-				glm::mat4 model = glm::mat4(1.0f);
-				glm::mat4 view = glm::mat4(1.0f);
-				// view = glm::rotate(view, float(2*i), glm::vec3(0.0f, 1.0f, 0.0f)); 
-				glm::mat4 projection = glm::ortho(-25.0f, 25.0f, -25.0f, 25.0f, -10.0f, 10.0f);
-
-				// link matrices with shader program
-				GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
-				GLint viewLoc = glGetUniformLocation(shaderProgram, "view");
-				GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
-				glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-				glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-				glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
-
-				// Clear the screen to black
-				glClearColor(0.0f, 0.0f, 0.0f, 0.5f);
-				glClear(GL_COLOR_BUFFER_BIT);
-
-				// Draw points
-				glDrawArrays(GL_POINTS, 0, BodyCount);
-
-				// Swap buffers
-				window->display();
-
-				glDeleteBuffers(1, &vbo);
-
-				glDeleteVertexArrays(1, &vao);
-				
-			}
-
-		}
-		
-		if(PLOT_OPENGL){
-			window->close(); 
-		}
-	}
-
 // Use arrays instead of array of struct to maximize coalescing
 // struct Position{
 //     float x;

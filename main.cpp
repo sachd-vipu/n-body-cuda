@@ -1,6 +1,5 @@
 #include <iostream>
 #include <string.h>
-#include <bits/stdc++.h>
 #include "NBodiesSimulation.hpp"
 
 using namespace std;
@@ -49,7 +48,7 @@ void displayGPUProp()
 
 int main(int argc, char** argv)
 {
-	constexpr int GRID_SIZE = 256;
+	constexpr int GRID_SIZE = 1024;
 	constexpr int BLOCK_SIZE = 128;
 	int num_bodies = GRID_SIZE * BLOCK_SIZE;  
 	displayGPUProp();

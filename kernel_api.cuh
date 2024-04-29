@@ -1,9 +1,8 @@
 struct 
 {
-    dim3 gridSize = 256;
+    dim3 gridSize = 1024;
     dim3 blockSize = 128;
 } params;  
-
 
 
  void ComputeBoundingBox(int *mutex, float *x, float *y, float *z, float *left, float *right, float *bottom, float *top, float* front, float *back, int p_count);

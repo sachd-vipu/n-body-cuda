@@ -1,37 +1,34 @@
-
-	
 # Makefile for nbody code using CUDA and C++
 
 # Compiler settings
-NVCC = nvcc
-CPP = g++
-OPT = -O2 -g -G
+NVCC = nvcc             
+CPP = g++                
+OPT = -O2 -g -G         
 STD = -std=c++11
 
-# Executable name
-EXECNAME = main
 
 # Objects and libraries
-OBJECTS =  kernel_api.o NBodiesSimulation.o main.o #simulation.o
-LIBS= #
-INCLUDES = # Dinclude directories 
+OBJECTS= main.o barneshut_kernel.o NBodiesSimulation.o kernel_api.o
+LIBS= -lGL -lGLEW -lsfml-graphics -lsfml-window -lsfml-system
+INCLUDES = -I/home/vipul/Desktop/n-body-cuda/glm-0.9.8.5/glm
+EXEC= main
 
 # Build target
 build: $(OBJECTS)
-	$(NVCC) $(OPT) -o $(EXECNAME) $(OBJECTS) $(LIBS)
+	$(NVCC) $(OPT) -o $(EXEC) $(OBJECTS) $(LIBS) 
 
-# Object files
+barneshut_kernel.o: barneshut_kernel.cu
+	$(NVCC) $(OPT)  -c barneshut_kernel.cu
+NBodiesSimulation.o: NBodiesSimulation.cpp
+	$(NVCC) $(OPT)  $(STD) -c $(INCLUDES)  NBodiesSimulation.cpp 
+kernel_api.o: kernel_api.cu
+	$(NVCC) $(OPT)  -c kernel_api.cu 
+main.o: main.cpp 
+	$(NVCC) $(OPT) -c $(INCLUDES) main.cpp
 
-#simulation.o: simulation.cu 
-#	$(NVCC) $(OPT)  -c  simulation.cu
-kernel_api.o: kernel_api.cu 
-	$(NVCC) $(OPT) -c kernel_api.cu 
-NBodiesSimulation.o: NBodiesSimulation.cpp 
-	$(NVCC) $(OPT) $(STD) -c NBodiesSimulation.cpp 
-main.o: main.cpp
-	$(NVCC) $(OPT) $(STD) -c $(INCLUDES)  main.cpp
-# Clean target
 .PHONY: clean
 clean:
-	rm -f $(OBJECTS) $(EXECNAME)
+	rm -f $(OBJECTS) $(EXEC)
+
+
 

@@ -253,28 +253,27 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 			cudaEventCreate(&stop);
 			cudaEventRecord(start, 0);
 
-			ResetArrays(device_x, device_y, device_z, device_top, device_bottom, device_right, device_left, device_front, device_back, device_mass, device_count, device_root, device_sorted, device_child, device_index, device_mutex, BodyCount, Nodes);
-			cudaErrorCheck();
-
-			ComputeBoundingBox(device_x, device_y, device_z,  device_top, device_bottom, device_right, device_left, device_front, device_back, device_mutex, BodyCount);			
-			// sleep(4);
+			// ResetArrays(device_x, device_y, device_z, device_top, device_bottom, device_right, device_left, device_front, device_back, device_mass, device_count, device_root, device_sorted, device_child, device_index, device_mutex, BodyCount, Nodes);
 			// cudaErrorCheck();
-			 ConstructOctree(device_x, device_y, device_z, device_top, device_bottom, device_right, device_left, device_front, device_back, device_mass, device_count, device_root, device_child, device_index, BodyCount);
-			cudaErrorCheck();
 
-			ComputeBodyInfo(device_x, device_y, device_z, device_mass, device_index, BodyCount);
-			cudaErrorCheck();
+			// ComputeBoundingBox(device_x, device_y, device_z,  device_top, device_bottom, device_right, device_left, device_front, device_back, device_mutex, BodyCount);			
+			// // cudaErrorCheck();
+			//  ConstructOctree(device_x, device_y, device_z, device_top, device_bottom, device_right, device_left, device_front, device_back, device_mass, device_count, device_root, device_child, device_index, BodyCount);
+			// cudaErrorCheck();
+
+			// ComputeBodyInfo(device_x, device_y, device_z, device_mass, device_index, BodyCount);
+			// cudaErrorCheck();
 			
-			SortBodies(device_count, device_root, device_sorted, device_child, device_index, BodyCount);
-			cudaErrorCheck();
+			// SortBodies(device_count, device_root, device_sorted, device_child, device_index, BodyCount);
+			// cudaErrorCheck();
 			
-			CalculateForce(device_x, device_y, device_z, device_vx, device_vy, device_vz, device_ax, device_ay, device_az, device_mass, device_sorted, device_child, device_left, device_right, BodyCount);
-			cudaErrorCheck();
+			// CalculateForce(device_x, device_y, device_z, device_vx, device_vy, device_vz, device_ax, device_ay, device_az, device_mass, device_sorted, device_child, device_left, device_right, BodyCount);
+			// cudaErrorCheck();
 			
-			UpdateParticles(device_x, device_y, device_z, device_vx, device_vy, device_vz, device_ax, device_ay, device_az, BodyCount, 0.001, 1.0);
-			cudaErrorCheck();
+			// UpdateParticles(device_x, device_y, device_z, device_vx, device_vy, device_vz, device_ax, device_ay, device_az, BodyCount, 0.001, 1.0);
+			// cudaErrorCheck();
 			
-			PopulateCoordinates(device_x, device_y, device_z, device_output, Nodes);
+			// PopulateCoordinates(device_x, device_y, device_z, device_output, Nodes);
 			cudaErrorCheck();
 			cudaEventRecord(stop, 0);
 			cudaEventSynchronize(stop);

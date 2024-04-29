@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "barneshut_kernel.cuh"
 
-__device__ const int blockSize = 256;
+__device__ const int blockSize = 128;
 __device__ const int warp = 32;
 __device__ const int stackSize = 64;
 __device__ const float eps2 = 0.025;
@@ -184,12 +184,11 @@ __global__ void kernel2_construct_octree(float *x, float *y, float *z, float *ma
 						if(z[ch_index] < 0.5*(f+ba)){
 							childPath += 4;
 					   }
-
 				 		
 				 			if(cell >= 2*p_count){
 				 				printf("cell: %d\n", cell);
+									break;
 				 			}
-				 		
 				 		x[cell] += mass[ch_index]*x[ch_index];
 				 		y[cell] += mass[ch_index]*y[ch_index];						
 						z[cell] += mass[ch_index]*z[ch_index];
@@ -454,5 +453,16 @@ __global__ void aux_kernel_initialize_device_arrays(int *mutex, float *x, float 
 		*front = 0;
 		*back = 0;
         *index = p_count;
+	}
+}
+
+__global__ void aux_kernel_plot_3D_points(float *out, float *x, float *y, float *z, int p_count)
+{
+	int cu_index = threadIdx.x + blockDim.x*blockIdx.x;
+	
+	if(cu_index < n){
+		ptr[2*index] = x[index];
+		ptr[2*index+1] = y[index];
+		ptr[2*index+2] = z[index];
 	}
 }

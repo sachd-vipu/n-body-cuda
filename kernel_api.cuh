@@ -22,4 +22,3 @@ struct
  
  void ResetArrays(int *mutex, float *x, float *y, float *z, float *mass, int *count, int *start, int *sorted, int *child, int *index, float *left, float *right, float *bottom, float *top, float* front, float *back,int p_count, int node_count);
 
- void Plot3DPoints(float *out, float *x, float *y, float *z, int p_count);

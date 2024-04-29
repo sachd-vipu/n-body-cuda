@@ -41,7 +41,4 @@ void ResetArrays(int *mutex, float *x, float *y, float *z, float *mass, int *cou
 	aux_kernel_initialize_device_arrays<<<params.gridSize, params.blockSize>>>(mutex, x, y, z, mass, count, start, sorted, child, index, left, right, bottom, top, front, back, p_count, node_count);
 }
 
-void Plot3DPoints(float *out, float *x, float *y, float *z, int p_count)
-{
-	aux_kernel_plot_3D_points<<<params.gridSize, params.blockSize>>>(out, x, y, z, p_count);
-}
+

@@ -1,13 +1,16 @@
-#include <cuda.h>
 #include <iostream>
 #include <stdlib.h>
 #include <time.h>
 #include <math.h>
 #include <random>
-#include <cuda_runtime.h>
-#include "kernel_api.cuh"
+#include "GPU_CONFIG.hpp"
 #include "NBodiesSimulation.hpp"
+#include "kernel_api.cuh"
+using namespace std;
+#include <stdio.h>
+#include <cuda.h>
 #include <unistd.h>
+
 using namespace std;
 
 #define cudaErrorCheck() { \
@@ -17,12 +20,42 @@ using namespace std;
 	} \
 }
 
+
+const GLchar* vertexSource =
+    "#version 130\n"
+    "in vec2 position;"
+    "uniform mat4 model;"
+    "uniform mat4 view;"
+    "uniform mat4 projection;"
+    "void main()"
+    "{"
+    "    gl_Position = projection * view * model *vec4(position, 0.0, 1.0);"
+    "}";
+
+const GLchar* fragmentSource =
+    "#version 130\n"
+    //"out vec4 outColor;"
+    "void main()"
+    "{"
+    "    gl_FragColor = vec4(1.0, 1.0, 1.0, 0.1);"
+    "}"; 
+
+static int calculateNumNodes(int numParticles, int maxComputeUnits, int warpSize){
+	int numberOfNodes = numParticles * 2;
+		if (numberOfNodes < 1024 * maxComputeUnits)
+			numberOfNodes = 1024 * maxComputeUnits;
+		// multiple of 32	
+		while ((numberOfNodes & (warpSize - 1)) != 0)
+			++numberOfNodes;
+
+			return numberOfNodes;
+}
+
+
+
 NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 			BodyCount = num_bodies;
-			Nodes = 8 * BodyCount + 1 ; // each node gets 8 children  1 for the root
-			//  TODO : Not all the noded are used. Need to optimize this
-			//Nodes = 4*BodyCount + 24000;
-			host_output = new float[BodyCount * 3];
+			Nodes = calculateNumNodes(n,COMPUTE_UNITS,WARP_SIZE) + 1;
 
 			host_left = new float;
 			host_right = new float;
@@ -78,23 +111,53 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 			cudaMemset(device_top, 0, sizeof(float));
 			cudaMemset(device_front, 0, sizeof(float));
 			cudaMemset(device_back, 0, sizeof(float));
+
 			cudaMemset(device_root, -1, Nodes * sizeof(int));
 			cudaMemset(device_sorted, 0, Nodes * sizeof(int));
+			cudaMalloc((void**)&device_output, 3 * Nodes * sizeof(float))
 			cudaErrorCheck();
 
+			if(PLOT_OPENGL){
+				settings = new sf::ContextSettings();
+				settings->depthBits = 24;
+				settings->stencilBits = 8;
+				window = new sf::Window(sf::VideoMode(1000, 1000, 32), "Barnes Hut SImulation", sf::Style::Titlebar | sf::Style::Close, *settings);
+
+				glewExperimental = GL_TRUE;
+				glewInit();
+
+				// Vertex shader
+				vertexShader = glCreateShader(GL_VERTEX_SHADER);
+				glShaderSource(vertexShader, 1, &vertexSource, NULL);
+				glCompileShader(vertexShader);
+
+				// Fragment shader
+				fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+				glShaderSource(fragmentShader, 1, &fragmentSource, NULL);
+				glCompileShader(fragmentShader);
+
+				// Link the
+				shaderProgram = glCreateProgram();
+				glAttachShader(shaderProgram, vertexShader);
+				glAttachShader(shaderProgram, fragmentShader);
+				glBindFragDataLocation(shaderProgram, 0, "outColor");
+				glLinkProgram(shaderProgram);
+				glUseProgram(shaderProgram);
+			}
+
 		}
+
 		NBodiesSimulation::~NBodiesSimulation(){
 			
 			cout << "Destructor called" << endl;
-	// print host_output
-			for(int i=0;i<3*Nodes;i++){
-			cout << host_output[i] << " ";
-			if (i%200 == 0){
-				cout << endl;
-			}
-			}
+			// print host_output
+			// for(int i=0;i<3*Nodes;i++){
+			// cout << host_output[i] << " ";
+			// if (i%200 == 0){
+			// 	cout << endl;
+			// }
+			// }
 
-			delete[] host_output;
 			delete[] host_x;
 			delete[] host_y;
 			delete[] host_z;
@@ -109,13 +172,15 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 			delete[] host_root;
 			delete[] host_sorted;
 			delete[] host_count;
+			delete[] host_output;
+
 			delete host_left;
 			delete host_right;
 			delete host_bottom;
 			delete host_top;
 			delete host_front;
 			delete host_back;
-
+		
 
 			cudaFree(device_left);
 			cudaFree(device_right);
@@ -141,16 +206,23 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 			cudaFree(device_mutex);
 			cudaFree(device_output);
 			
-			cout << "Destructor finished" << endl;
 			cudaError_t err = cudaDeviceSynchronize();
 			if (err != cudaSuccess) {
 					printf("CUDA error: %s\n", cudaGetErrorString(err));
 				}
-						cudaErrorCheck();
+			cudaErrorCheck();	
 
-		
+			if(PLOT_OPENGL){
+				delete settings;
+				delete window;
 
+				glDeleteProgram(shaderProgram);
+				glDeleteShader(fragmentShader);
+				glDeleteShader(vertexShader);
+			}
+			cout << "Destructor finished" << endl;
 		}
+
 
 		const float* NBodiesSimulation::getOutput(){
 			return host_output;
@@ -159,13 +231,13 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 		void NBodiesSimulation::setParticlePosition(float* x, float* y, float* z, float* vx, float* vy, float* vz,  float* ax, float*ay, float*az, float* mass, float p_count){
 			
 				float acl = 2.0;
-				float pi = 3.14159265;
+				float pi = PI;
 				default_random_engine generator;
 				uniform_real_distribution<float> distribution_core(1.5, 12.0);
 				uniform_real_distribution<float> distribution_outer(1, 5.0);
 				uniform_real_distribution<float> distributionZ(0.0, 3.0);
 				uniform_real_distribution<float> distribution_theta(0.0, 2 * pi);
-				float gravity = 6.6743e-11;
+				float gravity = GRAVITY;
 
 				// loop through all particles
 				for (int i = 0; i < p_count; i++){
@@ -247,7 +319,7 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 		cudaMemcpy(device_mass, host_mass, sizeof(host_mass), cudaMemcpyHostToDevice);
 
 	
-		for(int i=0;i< 600 ;i++){ 
+		for(int i=0;i< ITERATIONS ;i++){ 
 			float time;
 			cudaEventCreate(&start);
 			cudaEventCreate(&stop);

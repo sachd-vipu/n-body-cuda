@@ -1,9 +1,16 @@
+#include <cuda.h>
 #include <cuda_runtime.h>
+#include <GL/glew.h>
+#include <SFML/Window.hpp>
+#include <SFML/Graphics.hpp>
+#include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
+#include "glm/gtc/type_ptr.hpp"
 
 
-class NBodiesSimulation
+class NBodiesSimulation 
 {
-		int BodyCount;
+			int BodyCount;
 		int Nodes;
 
         // the sequence in which these arrays will be populated is important to maximize coalescing
@@ -63,11 +70,22 @@ class NBodiesSimulation
 		float *host_output;  
 		float *device_output;  
 
-	public:
-	NBodiesSimulation(const int num_bodies);
-	~NBodiesSimulation();
-	const float* getOutput();
-	void setParticlePosition(float* x, float* y, float* z, float* vx, float* vy, float* vz, float* ax, float*ay, float*az, float* mass, float p_count);			
-	void runAnimation();
+		sf::ContextSettings *settings;
+		sf::Window *window;
 
+		GLuint vao;
+		GLuint vbo;
+
+		GLuint vertexShader;
+		GLuint fragmentShader;
+		GLuint shaderProgram;
+
+
+	public:
+		NBodiesSimulation(const int num_bodies);
+		~NBodiesSimulation();
+		const float* getOutput();
+		void runAnimation();
+		void setParticlePosition(float* x, float* y, float* z, float* vx, float* vy, float* vz, float* ax, float*ay, float*az, float* mass, float p_count);			
+	
 };

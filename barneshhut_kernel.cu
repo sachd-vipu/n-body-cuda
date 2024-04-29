@@ -1,11 +1,10 @@
 #include <stdio.h>
 #include "barneshut_kernel.cuh"
 
-__device__ const int blockSize = 128;
+__device__ const int blockSize = 256;
 __device__ const int warp = 32;
-__device__ const int stackSize = 64;
+__device__ const int MAX_DEPTH = 64;
 __device__ const float eps2 = 0.025;
-
 
 // Ref: An Efficient CUDA Implementation of the Barnes-Hut Algorithm for the n-Body Simulation
 // Ref: Section B.5, B.6  https://www.aronaldg.org/courses/compecon/parallel/CUDA_Programming_Guide_2.2.1.pdf  
@@ -309,8 +308,8 @@ __global__ void kernel5_compute_forces_n_bodies(float* x, float *y, float *z, fl
 	int cu_index = threadIdx.x + blockIdx.x*blockDim.x;
 	int stride = blockDim.x*gridDim.x;
 
-	__shared__ float depth_s[stackSize*blockSize/warp]; 
-	__shared__ int stack_s[stackSize*blockSize/warp];  
+	__shared__ float depth_s[MAX_DEPTH*blockSize/warp]; 
+	__shared__ int stack_s[MAX_DEPTH*blockSize/warp];  
 
 	float particle_radius = 0.5f *(right[0] - left[0]);
 
@@ -322,7 +321,7 @@ __global__ void kernel5_compute_forces_n_bodies(float* x, float *y, float *z, fl
 	}
 
 	int counter = threadIdx.x % warp;
-	int stackStartIndex = stackSize * (threadIdx.x / warp);
+	int stackStartIndex = MAX_DEPTH * (threadIdx.x / warp);
 
 	for(int i= cu_index; i< p_count; i+= stride ){
 
@@ -453,16 +452,5 @@ __global__ void aux_kernel_initialize_device_arrays(int *mutex, float *x, float 
 		*front = 0;
 		*back = 0;
         *index = p_count;
-	}
-}
-
-__global__ void aux_kernel_plot_3D_points(float *out, float *x, float *y, float *z, int p_count)
-{
-	int cu_index = threadIdx.x + blockDim.x*blockIdx.x;
-	
-	if(cu_index < n){
-		ptr[2*index] = x[index];
-		ptr[2*index+1] = y[index];
-		ptr[2*index+2] = z[index];
 	}
 }

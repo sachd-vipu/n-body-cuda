@@ -55,7 +55,7 @@ static int calculateNumNodes(int numParticles, int maxComputeUnits, int warpSize
 
 NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 			BodyCount = num_bodies;
-			Nodes = calculateNumNodes(n,COMPUTE_UNITS,WARP_SIZE) + 1;
+			Nodes = calculateNumNodes(num_bodies,COMPUTE_UNITS,WARP_SIZE) + 1;
 
 			host_left = new float;
 			host_right = new float;
@@ -114,7 +114,7 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 
 			cudaMemset(device_root, -1, Nodes * sizeof(int));
 			cudaMemset(device_sorted, 0, Nodes * sizeof(int));
-			cudaMalloc((void**)&device_output, 3 * Nodes * sizeof(float))
+			cudaMalloc((void**)&device_output, 3 * Nodes * sizeof(float));
 			cudaErrorCheck();
 
 			if(PLOT_OPENGL){
@@ -230,74 +230,82 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 
 		void NBodiesSimulation::setParticlePosition(float* x, float* y, float* z, float* vx, float* vy, float* vz,  float* ax, float*ay, float*az, float* mass, float p_count){
 			
-				float acl = 2.0;
-				float pi = PI;
-				default_random_engine generator;
-				uniform_real_distribution<float> distribution_core(1.5, 12.0);
-				uniform_real_distribution<float> distribution_outer(1, 5.0);
-				uniform_real_distribution<float> distributionZ(0.0, 3.0);
-				uniform_real_distribution<float> distribution_theta(0.0, 2 * pi);
-				float gravity = GRAVITY;
-
-				// loop through all particles
-				for (int i = 0; i < p_count; i++){
-					float theta = distribution_theta(generator);
-					float offset1 = distribution_core(generator);
-					float offset2 = distribution_outer(generator);
-					float z_offset = distributionZ(generator);
-
-					// set intial mass / mass of particle decreases as we move outwards
-					
-					if(i==0){
-						mass[i] = 100000;
-						x[i] = 0;
-						y[i] = 0;
-						z[i] = 0;
-					}
-					else if(i==1){
-						mass[i] = 25000;
-						x[i] = 20*cos(theta);
-						y[i] = 20*sin(theta);
-						z[i] = x[i] + y[i]; 
-					}
-					else if(i<=3*p_count/4){
-						mass[i] = 1.0;
-						x[i] = offset1 *cos(theta);
-						y[i] = offset1 *sin(theta);
-						z[i] = z_offset * (x[i] + y[i]);
-					}
-					else{
-						mass[i] = 1.0;
-						x[i] = offset2*cos(theta) + x[1];
-						y[i] = offset2*sin(theta) + y[1];
-						z[i] = z_offset * (x[i] + y[i]);
-					}
+				float a = 1.0;
+	float pi = 3.14159265;
+	std::default_random_engine generator;
+	std::uniform_real_distribution<float> distribution1(1.5, 12.0);
+	std::uniform_real_distribution<float> distribution2(1, 5.0);
+	std::uniform_real_distribution<float> distribution_theta(0.0, 2 * pi);
 
 
-					float rotation = 1;  
-					float v1 = 1.0*sqrt(gravity*100000.0 / offset1);
-					float v2 = 1.0*sqrt(gravity*25000.0 / offset2);
-					float v = 1.0*sqrt(gravity*100000.0 / sqrt(800));
-					if(i==0 || i==1){
-						vx[0] = 0;
-						vy[0] = 0;
-						vz[0] = 0;
-					}
-					else if(i<=3*p_count/4){
-						vx[i] = rotation*v1*sin(theta);
-						vy[i] = -rotation*v1*cos(theta);
-						vz[i] = rotation*v1*sin(theta) * cos(theta) ;
-					}
-					else{
-						vx[i] = rotation*v2*sin(theta);
-						vy[i] = -rotation*v2*cos(theta);	
-						vz[i] = rotation*v2*sin(theta) * cos(theta) ;		
-					}
+	// loop through all particles
+	for (int i = 0; i < p_count; i++){
+		float theta = distribution_theta(generator);
+		float r1 = distribution1(generator);
+		float r2 = distribution2(generator);
 
-					ax[i] = 0.0;
-					ay[i] = 0.0;
-					az[i] = 0.0;
-				}
+		// set mass and position of particle
+		if(i==0){
+			mass[i] = 100000;
+			x[i] = 0;
+			y[i] = 0;
+			z[i] = 0;
+		}
+		else if(i==1){
+			mass[i] = 25000;
+			x[i] = 20*cos(theta);
+			y[i] = 20*sin(theta);
+			z[i] = (x[i] + y[i] ) *0.5;
+
+		}
+		else if(i<=3*p_count/4){
+			mass[i] = 1.0;
+			x[i] = r1*cos(theta);
+			y[i] = r1*sin(theta);
+						z[i] = (x[i] + y[i] ) *0.5;
+
+		}
+		else{
+			mass[i] = 1.0;
+			x[i] = r2*cos(theta) + x[1];
+			y[i] = r2*sin(theta) + y[1];
+			z[i] = (x[i] + y[i] ) *0.5;
+
+		}
+
+
+		// set velocity of particle
+		float rotation = 1;  // 1: clockwise   -1: counter-clockwise 
+		float v1 = 1.0*sqrt(GRAVITY*100000.0 / r1);
+		float v2 = 1.0*sqrt(GRAVITY*25000.0 / r2);
+		float v = 1.0*sqrt(GRAVITY*100000.0 / sqrt(800));
+		if(i==0){
+			vx[0] = 0;
+			vy[0] = 0;
+			vz[0] = 0;
+		}
+		else if(i==1){
+			vx[i] = 0.0;//rotation*v*sin(theta);
+			vy[i] = 0.0;//-rotation*v*cos(theta);
+			vz[i] = 0.0;
+		}
+		else if(i<=3*p_count/4){
+			vx[i] = rotation*v1*sin(theta);
+			vy[i] = -rotation*v1*cos(theta);
+			vz[i] = 0.0;
+		}
+		else{
+			vx[i] = rotation*v2*sin(theta);
+			vy[i] = -rotation*v2*cos(theta);	
+			vz[i] = 0.0;		
+		}
+
+		// set acceleration to zero
+		ax[i] = 0.0;
+		ay[i] = 0.0;
+		az[i] = 0.0;
+		}
+
 		}
 		
  
@@ -325,39 +333,79 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 			cudaEventCreate(&stop);
 			cudaEventRecord(start, 0);
 
-			// ResetArrays(device_x, device_y, device_z, device_top, device_bottom, device_right, device_left, device_front, device_back, device_mass, device_count, device_root, device_sorted, device_child, device_index, device_mutex, BodyCount, Nodes);
-			// cudaErrorCheck();
+			ResetArrays(device_mutex, device_x, device_y, device_z, device_mass, device_count, device_root, device_sorted, device_child, device_index, device_left, device_right, device_bottom, device_top, device_front, device_back, BodyCount, Nodes);
+			ComputeBoundingBox(device_mutex, device_x, device_y, device_z,  device_left, device_right, device_bottom, device_top,  device_front, device_back,  BodyCount);
+			ConstructOctree(device_x, device_y, device_z, device_mass, device_count, device_root, device_child, device_index, device_left, device_right, device_bottom, device_top, device_front, device_back, BodyCount);
+			ComputeBodyInfo(device_x, device_y, device_z, device_mass, device_index, BodyCount);
+			SortBodies(device_count, device_root, device_sorted, device_child, device_index, BodyCount);
+			CalculateForce(device_x, device_y, device_z, device_vx, device_vy, device_vz, device_ax, device_ay, device_az, device_mass, device_sorted, device_child, device_left, device_right, BodyCount, GRAVITY);
+			UpdateParticles(device_x, device_y, device_z, device_vx, device_vy, device_vz, device_ax, device_ay, device_az, BodyCount, TIMESTEP, DAMP);
+			PopulateCoordinates(device_x, device_y, device_z, device_output, Nodes);
 
-			// ComputeBoundingBox(device_x, device_y, device_z,  device_top, device_bottom, device_right, device_left, device_front, device_back, device_mutex, BodyCount);			
-			// // cudaErrorCheck();
-			//  ConstructOctree(device_x, device_y, device_z, device_top, device_bottom, device_right, device_left, device_front, device_back, device_mass, device_count, device_root, device_child, device_index, BodyCount);
-			// cudaErrorCheck();
-
-			// ComputeBodyInfo(device_x, device_y, device_z, device_mass, device_index, BodyCount);
-			// cudaErrorCheck();
-			
-			// SortBodies(device_count, device_root, device_sorted, device_child, device_index, BodyCount);
-			// cudaErrorCheck();
-			
-			// CalculateForce(device_x, device_y, device_z, device_vx, device_vy, device_vz, device_ax, device_ay, device_az, device_mass, device_sorted, device_child, device_left, device_right, BodyCount);
-			// cudaErrorCheck();
-			
-			// UpdateParticles(device_x, device_y, device_z, device_vx, device_vy, device_vz, device_ax, device_ay, device_az, BodyCount, 0.001, 1.0);
-			// cudaErrorCheck();
-			
-			// PopulateCoordinates(device_x, device_y, device_z, device_output, Nodes);
-			cudaErrorCheck();
-			cudaEventRecord(stop, 0);
+			cudaEventRecord(stop,0);
 			cudaEventSynchronize(stop);
 			cudaEventElapsedTime(&time, start, stop);
 			cudaEventDestroy(start);
 			cudaEventDestroy(stop);
+
+			cudaEventDestroy(stop);
 			cout << "Time taken for iteration " <<  i << " is " << time << endl;
 
-			cudaMemcpy(host_output, device_output, sizeof(device_output), cudaMemcpyDeviceToHost);
+			if(PLOT_OPENGL){
+				cudaMemcpy(host_output, device_output, sizeof(host_output), cudaMemcpyDeviceToHost);
+				//cudaDeviceSynchronize();
+			    const float* vertices = getOutput();
+
+				glGenVertexArrays(1, &vao);
+				glBindVertexArray(vao);
+
+				glGenBuffers(1, &vbo);   //generate a buffer
+				glBindBuffer(GL_ARRAY_BUFFER, vbo);   //make buffer active
+				glBufferData(GL_ARRAY_BUFFER, 3 * BodyCount *sizeof(float), vertices, GL_DYNAMIC_DRAW); //copy data to active buffer 
+
+				// Specify the layout of the vertex data
+				GLint posAttrib = glGetAttribLocation(shaderProgram, "position");
+				glEnableVertexAttribArray(posAttrib);
+				glVertexAttribPointer(posAttrib, 2, GL_FLOAT, GL_FALSE, 0, 0);
+
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+				glEnable(GL_BLEND);
+
+				// model, view, and projection matrices
+				glm::mat4 model = glm::mat4(1.0f);
+				glm::mat4 view = glm::mat4(1.0f);
+				// view = glm::rotate(view, float(2*i), glm::vec3(0.0f, 1.0f, 0.0f)); 
+				glm::mat4 projection = glm::ortho(-25.0f, 25.0f, -25.0f, 25.0f, -10.0f, 10.0f);
+
+				// link matrices with shader program
+				GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
+				GLint viewLoc = glGetUniformLocation(shaderProgram, "view");
+				GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
+				glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+				glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+				glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+
+				// Clear the screen to black
+				glClearColor(0.0f, 0.0f, 0.0f, 0.5f);
+				glClear(GL_COLOR_BUFFER_BIT);
+
+				// Draw points
+				glDrawArrays(GL_POINTS, 0, BodyCount);
+
+				// Swap buffers
+				window->display();
+
+				glDeleteBuffers(1, &vbo);
+
+				glDeleteVertexArrays(1, &vao);
+				
+			}
 
 		}
-		cudaDeviceSynchronize();
+		
+		if(PLOT_OPENGL){
+			window->close(); 
+		}
 	}
 
 // Use arrays instead of array of struct to maximize coalescing

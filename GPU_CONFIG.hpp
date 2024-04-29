@@ -8,8 +8,8 @@ constexpr float DAMP = 1.0;
 constexpr float GRAVITY = 1.0;
 constexpr int ITERATIONS = 20;
 constexpr float TIMESTEP = 0.001;
-constexpr bool PLOT_OPENGL = true;
+constexpr bool PLOT_OPENGL = false;
 constexpr int GRID_SIZE = 256;
-constexpr int BLOCK_SIZE = 128;
+constexpr int BLOCK_SIZE = 256;
 #endif 
 

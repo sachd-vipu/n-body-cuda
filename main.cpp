@@ -2,12 +2,11 @@
 #include <string.h>
 #include <bits/stdc++.h>
 #include "NBodiesSimulation.hpp"
-#include "GPU_CONFIG.hpp"
 
 using namespace std;
 
 
-void displayGPUProp_setSM()
+void displayGPUProp()
 {
 	// Set up CUDA device 
 	cudaDeviceProp properties;
@@ -43,7 +42,6 @@ void displayGPUProp_setSM()
 	std::cout << "                                                                          " << std::endl;
 	std::cout << "**************************************************************************" << std::endl;
 
-	COMPUTE_UNITS = properties.multiProcessorCount;
 }
 
 
@@ -51,8 +49,10 @@ void displayGPUProp_setSM()
 
 int main(int argc, char** argv)
 {
+	constexpr int GRID_SIZE = 256;
+	constexpr int BLOCK_SIZE = 128;
 	int num_bodies = GRID_SIZE * BLOCK_SIZE;  
-	displayGPUProp_setSM();
+	displayGPUProp();
 	NBodiesSimulation simulation(num_bodies);
 	simulation.runAnimation();
 	//simulation.~NBodiesSimulation();

@@ -1,7 +1,7 @@
 struct 
 {
-    dim3 gridSize = 512;
-    dim3 blockSize = 256;
+    dim3 gridSize = 256;
+    dim3 blockSize = 128;
 } params;  
 
 

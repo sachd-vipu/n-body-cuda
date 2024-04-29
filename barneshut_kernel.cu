@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "barneshut_kernel.cuh"
 
-__device__ const int blockSize = 256;
+__device__ const int blockSize = 128;
 __device__ const int warp = 32;
 __device__ const int MAX_DEPTH = 64;
 __device__ const float eps2 = 0.025;

@@ -211,14 +211,14 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 		{
 		displayGPUProp();
 		setParticlePosition(host_x, host_y, host_z, host_vx, host_vy, host_vz, host_ax, host_ay, host_az, host_mass, BodyCount);
-		cudaMemcpy(device_mass, host_mass, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
-		cudaMemcpy(device_x, host_x, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
-		cudaMemcpy(device_y, host_y, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
-		cudaMemcpy(device_z, host_z, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
-		cudaMemcpy(device_vx, host_vx, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
-		cudaMemcpy(device_vy, host_vy, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
-		cudaMemcpy(device_ax, host_ax, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
-		cudaMemcpy(device_ay, host_ay, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
+		cudaMemcpy(device_mass, host_mass, 3*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
+		cudaMemcpy(device_x, host_x, 3*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
+		cudaMemcpy(device_y, host_y, 3*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
+		cudaMemcpy(device_z, host_z, 3*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
+		cudaMemcpy(device_vx, host_vx, 3*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
+		cudaMemcpy(device_vy, host_vy, 3*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
+		cudaMemcpy(device_ax, host_ax, 3*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
+		cudaMemcpy(device_ay, host_ay, 3*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
 
 		float timeStep = 0.0;
 		
@@ -227,7 +227,7 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 			cudaEventCreate(&start);
 			cudaEventCreate(&stop);
 			cudaEventRecord(start, 0);
-
+		
 			ResetArrays(device_mutex, device_x, device_y, device_z, device_mass, device_count, device_root, device_sorted, device_child, device_index, device_left, device_right, device_bottom, device_top, device_front, device_back, BodyCount, Nodes);
 			ComputeBoundingBox(device_mutex, device_x, device_y, device_z,  device_left, device_right, device_bottom, device_top,  device_front, device_back,  BodyCount);
 			ConstructOctree(device_x, device_y, device_z, device_mass, device_count, device_root, device_child, device_index, device_left, device_right, device_bottom, device_top, device_front, device_back, BodyCount);
@@ -248,16 +248,16 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 
 			if(GENERATE_PARTICLEDATA){
 				timeStep += time;
-				cudaMemcpy(host_x, device_x, 2*BodyCount*sizeof(float), cudaMemcpyDeviceToHost);
-				cudaMemcpy(host_y, device_y, 2*BodyCount*sizeof(float), cudaMemcpyDeviceToHost);
-				cudaMemcpy(host_z, device_z, 2*BodyCount*sizeof(float), cudaMemcpyDeviceToHost);
-				cudaMemcpy(host_vx, device_vx,2*BodyCount*sizeof(float), cudaMemcpyDeviceToHost);
-				cudaMemcpy(host_vy, device_vy, 2*BodyCount*sizeof(float), cudaMemcpyDeviceToHost);
-				cudaMemcpy(host_vz, device_vz, 2*BodyCount*sizeof(float), cudaMemcpyDeviceToHost);
+				cudaMemcpy(host_x, device_x, 3*BodyCount*sizeof(float), cudaMemcpyDeviceToHost);
+				cudaMemcpy(host_y, device_y, 3*BodyCount*sizeof(float), cudaMemcpyDeviceToHost);
+				cudaMemcpy(host_z, device_z, 3*BodyCount*sizeof(float), cudaMemcpyDeviceToHost);
+				cudaMemcpy(host_vx, device_vx,3*BodyCount*sizeof(float), cudaMemcpyDeviceToHost);
+				cudaMemcpy(host_vy, device_vy, 3*BodyCount*sizeof(float), cudaMemcpyDeviceToHost);
+				cudaMemcpy(host_vz, device_vz, 3*BodyCount*sizeof(float), cudaMemcpyDeviceToHost);
 				cudaDeviceSynchronize();
 				char filename[50];
 				sprintf(filename, "collidingDisk%04d.dat", i);
-				writeAsciiOutput(filename, host_x, host_y, host_z, host_vx, host_vy, host_vz, 2*BodyCount, timeStep);
+				writeAsciiOutput(filename, host_x, host_y, host_z, host_vx, host_vy, host_vz, 3*BodyCount, timeStep);
 			}
 
 			if(PLOT_OPENGL){

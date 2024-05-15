@@ -257,7 +257,7 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 				cudaDeviceSynchronize();
 				char filename[50];
 				sprintf(filename, "collidingDisk%04d.dat", i);
-				writeAsciiOutput(filename, host_x, host_y, host_z, host_vx, host_vy, host_vz, 3*BodyCount, timeStep);
+				writeAsciiOutput(filename, host_x, host_y, host_z, host_vx, host_vy, host_vz, BodyCount, timeStep);
 			}
 
 			if(PLOT_OPENGL){

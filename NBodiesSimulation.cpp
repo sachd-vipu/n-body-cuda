@@ -360,7 +360,7 @@ void NBodiesSimulation::collidingDisks(float* x, float* y, float* z, float* vx, 
 			y[i] = 0;
 			z[i] = 0;
 		}
-		else if(i==1){
+		else if(i==galaxy2){
 			mass[i] = 55000;
 			x[i] = 15*sin(theta) * cos(phi);
 			y[i] = 20*sin(theta) * sin(phi);
@@ -398,9 +398,9 @@ void NBodiesSimulation::collidingDisks(float* x, float* y, float* z, float* vx, 
 		float y_final = cos(pi/6) * y_rotatedevice_z - sin(pi/6) * z_rotatedevice_z;
 		float z_final = sin(pi/6) * y_rotatedevice_z + cos(pi/6) * z_rotatedevice_z;
 
-		x[i] =  x_final +  x[1];
-		y[i] =  y_final + y[1];
-		z[i] =  z_final + z[1];
+		x[i] =  x_final +  x[galaxy2];
+		y[i] =  y_final + y[galaxy2];
+		z[i] =  z_final + z[galaxy2];
 
 		}
 

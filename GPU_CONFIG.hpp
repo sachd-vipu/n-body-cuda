@@ -3,7 +3,7 @@
 
 extern int COMPUTE_UNITS = 20;
 constexpr int WARP_SIZE = 32;
-constexpr float PI = 3.14159266;
+constexpr float PI = 3.14159265;
 constexpr float DAMP = 1.0;
 constexpr float GRAVITY = 1.0;
 constexpr int ITERATIONS = 80;

@@ -10,11 +10,10 @@
 
 class NBodiesSimulation 
 {
-			int BodyCount;
+		int BodyCount;
 		int Nodes;
 
         // the sequence in which these arrays will be populated is important to maximize coalescing
-       
        
 		float *host_left;
 		float *host_right;
@@ -87,5 +86,6 @@ class NBodiesSimulation
 		const float* getOutput();
 		void runAnimation();
 		void setParticlePosition(float* x, float* y, float* z, float* vx, float* vy, float* vz, float* ax, float*ay, float*az, float* mass, float p_count);			
-	
+		void collidingDisks(float* x, float* y, float* z, float* vx, float* vy, float* vz, float* ax, float*ay, float*az, float* mass, float p_count);
+		void spatialCube(float* x, float* y, float* z, float* vx, float* vy, float* vz, float* ax, float*ay, float*az, float* mass, float p_count);
 };

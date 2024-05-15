@@ -5,19 +5,13 @@
 #include <random>
 #include "GPU_CONFIG.hpp"
 #include "NBodiesSimulation.hpp"
+#include "utils.hpp"
 #include "kernel_api.cuh"
-using namespace std;
 #include <stdio.h>
 #include <cuda.h>
 #include <unistd.h>
 
-
-#define cudaErrorCheck() { \
-	cudaError_t err = cudaGetLastError(); \
-	if (err != cudaSuccess) { \
-		printf("CUDA error: %s\n", cudaGetErrorString(err)); \
-	} \
-}
+using namespace std;
 
 
 const GLchar* vertexSource =
@@ -39,61 +33,11 @@ const GLchar* fragmentSource =
     "    gl_FragColor = vec4(1.0, 1.0, 1.0, 0.1);"
     "}"; 
 
-static int calculateNumNodes(int BodyCount, int maxComputeUnits, int warpSize){
-	int numberOfNodes = BodyCount * 2;
-		if (numberOfNodes < 1024 * maxComputeUnits)
-			numberOfNodes = 1024 * maxComputeUnits;
-		// multiple of 32	
-		while ((numberOfNodes & (warpSize - 1)) != 0)
-			++numberOfNodes;
-
-			return numberOfNodes;
-}
-
-
-static void displayGPUProp()
-{
-	// Set up CUDA device 
-	cudaDeviceProp properties;
-
-	cudaGetDeviceProperties(&properties,0);
-
-	int multiplier = 1024;
-	int driverVersion, runtimeVersion;
-
-	cudaDriverGetVersion(&driverVersion);
-    cudaRuntimeGetVersion(&runtimeVersion);
-
-
-	std::cout << "************************************************************************" << std::endl;
-	std::cout << "                          NVIDIA CUDA device Properties                 " << std::endl;
-	std::cout << "************************************************************************" << std::endl;
-	std::cout << "Name:                                    " << properties.name << std::endl;
-	//std::cout << "CUDA driver/runtime version:             " << driverVersion/1000 << "." << (driverVersion%100)/10 << "/" << runtimeVersion/1000 << "." << (runtimeVersion%100)/10 << std::endl;
-	//std::cout << "CUDA compute capabilitiy:                " << properties.major << "." << properties.minor << std::endl;
-	std::cout << "Number of Compute Units (SM's):          " << properties.multiProcessorCount << std::endl;                           
-	std::cout << "GPU clock :                          " << properties.clockRate/multiplier << " (MHz)" << std::endl;
-	std::cout << "Memory clock :                       " << properties.memoryClockRate/multiplier << " (MHz)" << std::endl;
-//	std::cout << "Memory bus width:                        " << properties.memoryBusWidth << "-bit" << std::endl;
-//	std::cout << "Theoretical memory bandwidth:            " << (properties.memoryClockRate/multiplier*(properties.memoryBusWidth/8)*2)/multiplier <<" (GB/s)" << std::endl;
-	std::cout << "Device global memory:                    " << properties.totalGlobalMem/(multiplier*multiplier) << " (MB)" << std::endl;
-	std::cout << "Shared memory per block:                 " << properties.sharedMemPerBlock/multiplier <<" (KB)" << std::endl;
-	std::cout << "Constant memory:                         " << properties.totalConstMem/multiplier << " (KB)" << std::endl;
-//	std::cout << "Maximum number of threads per block:     " << properties.maxThreadsPerBlock << std::endl;
-	std::cout << "Maximum thread dimension:                [" << properties.maxThreadsDim[0] << ", " << properties.maxThreadsDim[1] << ", " << properties.maxThreadsDim[2] << "]" << std::endl;
-	std::cout << "Maximum grid size:                       [" << properties.maxGridSize[0] << ", " << properties.maxGridSize[1] << ", " << properties.maxGridSize[2] << "]" << std::endl;
-	std::cout << "Warp size:                               " << properties.warpSize << std::endl;
-	std::cout << "**************************************************************************" << std::endl;
-	std::cout << "                                                                          " << std::endl;
-	std::cout << "**************************************************************************" << std::endl;
-
-}
-
 
 
 NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 			BodyCount = num_bodies;
-			Nodes = calculateNumNodes(num_bodies,COMPUTE_UNITS,WARP_SIZE) + 1;
+			Nodes = calculateNumNodes(num_bodies,COMPUTE_UNITS,WARP_SIZE);
 
 			host_left = new float;
 			host_right = new float;
@@ -265,18 +209,19 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 
 		void NBodiesSimulation::runAnimation()
 		{
-			displayGPUProp();
+		displayGPUProp();
 		setParticlePosition(host_x, host_y, host_z, host_vx, host_vy, host_vz, host_ax, host_ay, host_az, host_mass, BodyCount);
-	cudaMemcpy(device_mass, host_mass, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
-	cudaMemcpy(device_x, host_x, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
-	cudaMemcpy(device_y, host_y, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
-	cudaMemcpy(device_z, host_z, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
-	cudaMemcpy(device_vx, host_vx, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
-	cudaMemcpy(device_vy, host_vy, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
-	cudaMemcpy(device_ax, host_ax, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
-	cudaMemcpy(device_ay, host_ay, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
+		cudaMemcpy(device_mass, host_mass, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
+		cudaMemcpy(device_x, host_x, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
+		cudaMemcpy(device_y, host_y, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
+		cudaMemcpy(device_z, host_z, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
+		cudaMemcpy(device_vx, host_vx, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
+		cudaMemcpy(device_vy, host_vy, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
+		cudaMemcpy(device_ax, host_ax, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
+		cudaMemcpy(device_ay, host_ay, 2*BodyCount*sizeof(float), cudaMemcpyHostToDevice);
 
-	
+		float timeStep = 0.0;
+		
 		for(int i=0;i< ITERATIONS ;i++){ 
 			float time;
 			cudaEventCreate(&start);
@@ -297,9 +242,23 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 			cudaEventElapsedTime(&time, start, stop);
 			cudaEventDestroy(start);
 			cudaEventDestroy(stop);
-
 			cudaEventDestroy(stop);
+
 			cout << "Time taken for iteration " <<  i << " is " << time << endl;
+
+			if(GENERATE_PARTICLEDATA){
+				timeStep += time;
+				cudaMemcpy(host_x, device_x, 2*BodyCount*sizeof(float), cudaMemcpyDeviceToHost);
+				cudaMemcpy(host_y, device_y, 2*BodyCount*sizeof(float), cudaMemcpyDeviceToHost);
+				cudaMemcpy(host_z, device_z, 2*BodyCount*sizeof(float), cudaMemcpyDeviceToHost);
+				cudaMemcpy(host_vx, device_vx,2*BodyCount*sizeof(float), cudaMemcpyDeviceToHost);
+				cudaMemcpy(host_vy, device_vy, 2*BodyCount*sizeof(float), cudaMemcpyDeviceToHost);
+				cudaMemcpy(host_vz, device_vz, 2*BodyCount*sizeof(float), cudaMemcpyDeviceToHost);
+				cudaDeviceSynchronize();
+				char filename[50];
+				sprintf(filename, "collidingDisk%04d.dat", i);
+				writeAsciiOutput(filename, host_x, host_y, host_z, host_vx, host_vy, host_vz, 2*BodyCount, timeStep);
+			}
 
 			if(PLOT_OPENGL){
 			cudaMemcpy(host_output, device_output, 2*Nodes*sizeof(float), cudaMemcpyDeviceToHost);
@@ -368,20 +327,32 @@ NBodiesSimulation::NBodiesSimulation(const int num_bodies){
 
 void NBodiesSimulation::setParticlePosition(float* x, float* y, float* z, float* vx, float* vy, float* vz,  float* ax, float*ay, float*az, float* mass, float p_count)
 {
-			
+	collidingDisks(x, y, z, vx, vy, vz, ax, ay, az, mass, p_count);
+	//spatialCube(x, y, z, vx, vy, vz, ax, ay, az, mass, p_count);
+}
+		
+void NBodiesSimulation::collidingDisks(float* x, float* y, float* z, float* vx, float* vy, float* vz, float* ax, float*ay, float*az, float* mass, float p_count)
+{
 	float pi = PI;
 	std::default_random_engine generator;
-	std::uniform_real_distribution<float> distribution1(1.5, 12.0);
-	std::uniform_real_distribution<float> distribution2(1, 5.0);
-	std::uniform_real_distribution<float> distribution_theta(0.0, 2 * pi);
+	std::uniform_real_distribution<float> distribution1(3.5, 10.0);
+	std::uniform_real_distribution<float> distribution2(1.5, 5.5);
 
+	std::uniform_real_distribution<float> distribution_theta(0.0, 2*pi);
+	std::uniform_real_distribution<float> distribution_phi(0.0, 3*pi);
+	std::uniform_real_distribution<float> distribution_r_disc(3.5, 12.0);
+	std::uniform_real_distribution<float> distribution_z_disc(-1.0, 1.0);
 
+	int galaxy2 = 3*p_count/4;
 	// loop through all particles
 	for (int i = 0; i < p_count; i++){
 		float theta = distribution_theta(generator);
+		float phi = distribution_phi(generator);
 		float r1 = distribution1(generator);
 		float r2 = distribution2(generator);
-
+		float r_disc = distribution_r_disc(generator);
+		float z_disc = distribution_z_disc(generator);
+		const int limit_centre = 0;
 		// set mass and position of particle
 		if(i==0){
 			mass[i] = 100000;
@@ -390,64 +361,146 @@ void NBodiesSimulation::setParticlePosition(float* x, float* y, float* z, float*
 			z[i] = 0;
 		}
 		else if(i==1){
-			mass[i] = 25000;
-			x[i] = 20*cos(theta);
-			y[i] = 20*sin(theta);
-			z[i] = (x[i] + y[i] ) *0.5;
-
-		}
-		else if(i<=3*p_count/4){
-			mass[i] = 1.0;
-			x[i] = r1*cos(theta);
-			y[i] = r1*sin(theta);
-						z[i] = (x[i] + y[i] ) *0.5;
-
-		}
-		else{
-			mass[i] = 1.0;
-			x[i] = r2*cos(theta) + x[1];
-			y[i] = r2*sin(theta) + y[1];
-			z[i] = (x[i] + y[i] ) *0.5;
+			mass[i] = 55000;
+			x[i] = 15*sin(theta) * cos(phi);
+			y[i] = 20*sin(theta) * sin(phi);
+			z[i] = 20*cos(theta);
 
 		}
 
+		else if(i < galaxy2){
+					if( i < limit_centre){
+					mass[i] = 1.0;
+					x[i] = 3.5*sin(theta) * cos(phi);
+					y[i] = 3.5*sin(theta) * sin(phi);
+					z[i] = 3.5*cos(theta);
+					}
+				else {  
+						mass[i] = 1.0;
+						x[i] = r_disc * cos(theta);  
+						y[i] = r_disc * sin(theta);
+						z[i] = z_disc * (1 - (r_disc - 3.5) / 8.5) * sin(phi) * cos(phi); // TO MAKE THE DISK GALAXY THINNER AT EDGES
+						}
 
-		// set velocity of particle
-		float rotation = 1;  // 1: clockwise   -1: counter-clockwise 
+		}
+	else{
+		mass[i] = 2.0;
+
+		float x_original = r2 * cos(theta);
+		float y_original = r2 * sin(theta);
+		float z_original =  z_disc * (1 - (r2 - 1.5) / 4.0); // TO MAKE THE DISK GALAXY THINNER AT EDGES
+
+		float x_rotatedevice_z = cos(pi/3) * x_original - sin(pi/3) * y_original;
+		float y_rotatedevice_z = sin(pi/3) * x_original + cos(pi/3) * y_original;
+		float z_rotatedevice_z = z_original;
+
+		float x_final = x_rotatedevice_z;
+		float y_final = cos(pi/6) * y_rotatedevice_z - sin(pi/6) * z_rotatedevice_z;
+		float z_final = sin(pi/6) * y_rotatedevice_z + cos(pi/6) * z_rotatedevice_z;
+
+		x[i] =  x_final +  x[1];
+		y[i] =  y_final + y[1];
+		z[i] =  z_final + z[1];
+
+		}
+
+		float rotation = 1;  
 		float v1 = 1.0*sqrt(GRAVITY*100000.0 / r1);
-		float v2 = 1.0*sqrt(GRAVITY*25000.0 / r2);
-		float v = 1.0*sqrt(GRAVITY*100000.0 / sqrt(800));
-		if(i==0){
-			vx[0] = 0;
-			vy[0] = 0;
-			vz[0] = 0;
+		float v2 = 1.0*sqrt(GRAVITY*55000.0 / r2);
+		if(i==0 || i == 1){
+			vx[i] = 0;
+			vy[i] = 0;
+			vz[i] = 0;
 		}
-		else if(i==1){
-			vx[i] = 0.0;//rotation*v*sin(theta);
-			vy[i] = 0.0;//-rotation*v*cos(theta);
-			vz[i] = 0.0;
-		}
-		else if(i<=3*p_count/4){
-			vx[i] = rotation*v1*sin(theta);
-			vy[i] = -rotation*v1*cos(theta);
-			vz[i] = 0.0;
+		else if(i< galaxy2){
+			if (i < limit_centre){
+				vx[i] = 0;
+				vy[i] = -1 * rotation*v1*cos(theta);
+				vz[i] = rotation*v1*sin(theta);
+			}
+			else{
+				vx[i] = rotation*v1*sin(theta) ;
+				vy[i] = -1 * rotation*v1*cos(theta);
+				vz[i] = 0;//0.1*v1;
+			}
+			
+
 		}
 		else{
-			vx[i] = rotation*v2*sin(theta);
-			vy[i] = -rotation*v2*cos(theta);	
-			vz[i] = 0.0;		
+
+			 		float x_vel_original = -1* rotation * v2 * sin(theta);
+					float y_vel_original = 1 * rotation * v2 * cos(theta);
+					float z_vel_original = 0;
+
+					// Rotate velocities around z-axis by 60 degrees
+					float x_vel_rotatedevice_z = cos(pi/3) * x_vel_original - sin(pi/3) * y_vel_original;
+					float y_vel_rotatedevice_z = sin(pi/3) * x_vel_original + cos(pi/3) * y_vel_original;
+					float z_vel_rotatedevice_z = z_vel_original;
+
+					// Rotate velocities around x-axis by 30 degrees
+					vx[i] = x_vel_rotatedevice_z;
+					vy[i] = cos(pi/6) * y_vel_rotatedevice_z - sin(pi/6) * z_vel_rotatedevice_z;
+					vz[i] = sin(pi/6) * y_vel_rotatedevice_z + cos(pi/6) * z_vel_rotatedevice_z;
 		}
 
 		// set acceleration to zero
 		ax[i] = 0.0;
 		ay[i] = 0.0;
 		az[i] = 0.0;
-		}
-
-		}
+	}	
 		
- 
 
+}
+
+
+void NBodiesSimulation::spatialCube(float* x, float* y, float* z, float* vx, float* vy, float* vz, float* ax, float*ay, float*az, float* mass, float p_count)
+{
+  	float cube_side = 20.0;  
+
+	for (int i = 0; i < p_count; i++){
+		mass[i] = 1.0;
+		vx[i] = 0.0;
+		vy[i] = 0.0;
+		vz[i] = 0.0;
+		ax[i] = 0.0;
+		ay[i] = 0.0;
+		az[i] = 0.0;
+	}
+
+    default_random_engine generator;
+    uniform_real_distribution<float> distribution(0.0, cube_side);
+
+    int n_per_side = cbrt(p_count);
+
+    while (n_per_side * n_per_side * n_per_side > p_count) {
+        n_per_side--;
+    }
+
+    int total_gridevice_particles = n_per_side * n_per_side * n_per_side;
+    int remaining_particles = p_count - total_gridevice_particles;
+
+    float spacing = cube_side / (n_per_side - 1);
+	cout<< spacing;
+    int index = 0;
+    for (int i = 0; i < n_per_side; ++i) {
+        for (int j = 0; j < n_per_side; ++j) {
+            for (int k = 0; k < n_per_side; ++k) {
+                x[index] = i * spacing;
+                y[index] = j * spacing;
+                z[index] = k * spacing;
+                ++index;
+            }
+        }
+    }
+
+    for (int i = 0; i < remaining_particles; ++i) {
+        x[index] = distribution(generator);
+        y[index] = distribution(generator);
+        z[index] = distribution(generator);
+        ++index;
+    }
+
+}
 
 	
 // Use arrays instead of array of struct to maximize coalescing

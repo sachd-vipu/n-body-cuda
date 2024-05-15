@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include "barneshut_kernel.cuh"
 
-__device__ const int blockSize = 128;
+__device__ const int blockSize = 1024;
 __device__ const int warp = 32;
-__device__ const int MAX_DEPTH = 64;
-__device__ const float eps2 = 0.025;
+__device__ const int MAX_DEPTH = 128;
+__device__ const float eps = 0.025;
 
 // Ref: An Efficient CUDA Implementation of the Barnes-Hut Algorithm for the n-Body Simulation
 // Ref: Section B.5, B.6  https://www.aronaldg.org/courses/compecon/parallel/CUDA_Programming_Guide_2.2.1.pdf  
@@ -339,7 +339,7 @@ __global__ void kernel5_compute_forces_n_bodies(float* x, float *y, float *z, fl
 			for(int j = 0 ;j < 8;j++){
 				if(child[j] != -1){
 					stack_s[stackStartIndex + temp] = child[j];
-					depth_s[stackStartIndex + temp] = particle_radius*particle_radius/0.5;
+					depth_s[stackStartIndex + temp] = particle_radius*particle_radius/0.5; // theta = 0.5
 					temp++;
 				}
 
@@ -361,7 +361,7 @@ __global__ void kernel5_compute_forces_n_bodies(float* x, float *y, float *z, fl
 					float dx = x[ch] - pos_x;
   					float dy = y[ch] - pos_y;
 					float dz = z[ch] - pos_z;		
-    				float r = dx*dx + dy*dy + eps2;
+    				float r = dx*dx + dy*dy +  + dz*dz + eps;
     				if(ch < p_count  || __all(dp <= r)){ 
     					r = rsqrt(r);
     					float f = mass[ch] * r * r * r;

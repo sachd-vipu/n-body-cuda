@@ -10,12 +10,6 @@ To install and run this simulation, you need the following:
 - **G++ Compiler:** Ensure you have a modern version of G++ that supports at least C++11.
 - **Nvidia Driver and CUDA Toolkit:** Install the latest versions suitable for your hardware.
 
-### Installation Steps
-
-1. Install GLM and include its path in your project.
-2. Install the latest versions of the Nvidia driver and CUDA toolkit.
-3. Ensure you have a modern G++ compiler installed.
-
 ## Usage
 
 To compile and run the simulation:
@@ -45,7 +39,7 @@ To compile and run the simulation:
 
 - **Octree Representation:** Efficiently handles the computational complexity of the N-body simulation.
 - **Array-Based Data Structures:** Enhances performance by optimizing memory access patterns.
-- **Flexible Configuration:** Adjust simulation parameters easily through GPU_CONFIG.gpp.
+- **Flexible Configuration:** Adjust simulation parameters easily through GPU_CONFIG.hpp.
 
 
 ### Technical Insights:
